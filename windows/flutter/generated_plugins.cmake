@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   clipboard_watcher
   cloud_firestore
   firebase_core
+  isar_flutter_libs
   system_tray
 )
 

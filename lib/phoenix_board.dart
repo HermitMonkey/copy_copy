@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'models/clipboard_item.dart'; // <--- CRITICAL IMPORT
 
 class PhoenixBoard extends StatelessWidget {
-  final List<String> history;
+  final List<ClipboardItem> history;
   final VoidCallback onHide;
   final ThemeMode currentThemeMode;
   final Function(ThemeMode) onThemeChanged;
@@ -17,7 +18,6 @@ class PhoenixBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Determine if we are effectively in dark mode (either forced or via system)
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -94,7 +94,7 @@ class PhoenixBoard extends StatelessWidget {
         ),
         const Spacer(),
         ElevatedButton.icon(
-          onPressed: () => print("🚀 Running AI..."),
+          onPressed: () => print("🚀 Triggering Gemini..."),
           icon: const Icon(Icons.auto_awesome, size: 14),
           label: const Text("Run AI", style: TextStyle(fontSize: 12)),
           style: ElevatedButton.styleFrom(
@@ -211,24 +211,34 @@ class PhoenixBoard extends StatelessWidget {
       itemCount: history.length,
       separatorBuilder: (context, index) =>
           Divider(height: 1, color: isDark ? Colors.white10 : Colors.black12),
-      itemBuilder: (context, index) => ListTile(
-        dense: true,
-        leading: Text(
-          "${index + 1}",
-          style: TextStyle(
-            fontSize: 10,
-            color: isDark ? Colors.grey[600] : Colors.grey[400],
+      itemBuilder: (context, index) {
+        final item = history[index];
+        final String timeStr =
+            "${item.timestamp.hour.toString().padLeft(2, '0')}:${item.timestamp.minute.toString().padLeft(2, '0')}";
+
+        return ListTile(
+          dense: true,
+          leading: Text(
+            "${index + 1}",
+            style: TextStyle(
+              fontSize: 10,
+              color: isDark ? Colors.grey[600] : Colors.grey[400],
+            ),
           ),
-        ),
-        title: Text(
-          history[index],
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12),
-        ),
-        onTap: () async =>
-            await Clipboard.setData(ClipboardData(text: history[index])),
-      ),
+          title: Text(
+            item.content,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12),
+          ),
+          subtitle: Text(
+            timeStr,
+            style: const TextStyle(fontSize: 9, color: Colors.blueGrey),
+          ),
+          onTap: () async =>
+              await Clipboard.setData(ClipboardData(text: item.content)),
+        );
+      },
     );
   }
 }

@@ -1,17 +1,14 @@
-# copy_copy
+# Copy-Copy (Phoenix Board)
 
-A new Flutter project.
+A local-first, AI-enriched clipboard manager and contextual research environment. 
 
-## Getting Started
+## Background
+Standard clipboard managers act as passive storage bins. Copy-Copy is designed to be an active intelligence tool. It captures user data locally with zero latency and utilizes a hybrid AI pipeline to synthesize, categorize, and connect adjacent ideas within a dedicated workspace known as the Phoenix Board.
 
-This project is a starting point for a Flutter application.
+## Current Architecture
+* **Local-First Storage:** Powered by the Isar NoSQL database for lightning-fast, offline-first persistence and full-text search.
+* **Native Desktop Integration:** Features a dynamic macOS window activation policy, system tray management, and native dark/light theme morphing.
+* **Privacy by Design:** Data is captured and held locally on the device, laying the groundwork for a secure, local-firewall AI triage system.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## License
+This project is licensed under the MIT License - see the LICENSE file for details.
