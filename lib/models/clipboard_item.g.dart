@@ -32,28 +32,38 @@ const ClipboardItemSchema = CollectionSchema(
       name: r'contentType',
       type: IsarType.string,
     ),
-    r'faviconUrl': PropertySchema(
+    r'contextualImages': PropertySchema(
       id: 3,
+      name: r'contextualImages',
+      type: IsarType.stringList,
+    ),
+    r'faviconUrl': PropertySchema(
+      id: 4,
       name: r'faviconUrl',
       type: IsarType.string,
     ),
     r'heroImageUrl': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'heroImageUrl',
       type: IsarType.string,
     ),
     r'isSensitive': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'isSensitive',
       type: IsarType.bool,
     ),
+    r'isShared': PropertySchema(
+      id: 7,
+      name: r'isShared',
+      type: IsarType.bool,
+    ),
     r'timestamp': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'title': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'title',
       type: IsarType.string,
     )
@@ -89,6 +99,19 @@ const ClipboardItemSchema = CollectionSchema(
           caseSensitive: false,
         )
       ],
+    ),
+    r'isShared': IndexSchema(
+      id: 325927935090462033,
+      name: r'isShared',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'isShared',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
     )
   },
   links: {},
@@ -116,6 +139,18 @@ int _clipboardItemEstimateSize(
     final value = object.contentType;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final list = object.contextualImages;
+    if (list != null) {
+      bytesCount += 3 + list.length * 3;
+      {
+        for (var i = 0; i < list.length; i++) {
+          final value = list[i];
+          bytesCount += value.length * 3;
+        }
+      }
     }
   }
   {
@@ -148,11 +183,13 @@ void _clipboardItemSerialize(
   writer.writeString(offsets[0], object.articleText);
   writer.writeString(offsets[1], object.content);
   writer.writeString(offsets[2], object.contentType);
-  writer.writeString(offsets[3], object.faviconUrl);
-  writer.writeString(offsets[4], object.heroImageUrl);
-  writer.writeBool(offsets[5], object.isSensitive);
-  writer.writeDateTime(offsets[6], object.timestamp);
-  writer.writeString(offsets[7], object.title);
+  writer.writeStringList(offsets[3], object.contextualImages);
+  writer.writeString(offsets[4], object.faviconUrl);
+  writer.writeString(offsets[5], object.heroImageUrl);
+  writer.writeBool(offsets[6], object.isSensitive);
+  writer.writeBool(offsets[7], object.isShared);
+  writer.writeDateTime(offsets[8], object.timestamp);
+  writer.writeString(offsets[9], object.title);
 }
 
 ClipboardItem _clipboardItemDeserialize(
@@ -165,12 +202,14 @@ ClipboardItem _clipboardItemDeserialize(
   object.articleText = reader.readStringOrNull(offsets[0]);
   object.content = reader.readString(offsets[1]);
   object.contentType = reader.readStringOrNull(offsets[2]);
-  object.faviconUrl = reader.readStringOrNull(offsets[3]);
-  object.heroImageUrl = reader.readStringOrNull(offsets[4]);
+  object.contextualImages = reader.readStringList(offsets[3]);
+  object.faviconUrl = reader.readStringOrNull(offsets[4]);
+  object.heroImageUrl = reader.readStringOrNull(offsets[5]);
   object.id = id;
-  object.isSensitive = reader.readBool(offsets[5]);
-  object.timestamp = reader.readDateTime(offsets[6]);
-  object.title = reader.readStringOrNull(offsets[7]);
+  object.isSensitive = reader.readBool(offsets[6]);
+  object.isShared = reader.readBool(offsets[7]);
+  object.timestamp = reader.readDateTime(offsets[8]);
+  object.title = reader.readStringOrNull(offsets[9]);
   return object;
 }
 
@@ -188,14 +227,18 @@ P _clipboardItemDeserializeProp<P>(
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readStringList(offset)) as P;
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 7:
+      return (reader.readBool(offset)) as P;
+    case 8:
+      return (reader.readDateTime(offset)) as P;
+    case 9:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -227,6 +270,14 @@ extension ClipboardItemQueryWhereSort
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         const IndexWhereClause.any(indexName: r'timestamp'),
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhere> anyIsShared() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'isShared'),
       );
     });
   }
@@ -438,6 +489,51 @@ extension ClipboardItemQueryWhere
         upper: [upperTimestamp],
         includeUpper: includeUpper,
       ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause> isSharedEqualTo(
+      bool isShared) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'isShared',
+        value: [isShared],
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
+      isSharedNotEqualTo(bool isShared) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isShared',
+              lower: [],
+              upper: [isShared],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isShared',
+              lower: [isShared],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isShared',
+              lower: [isShared],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isShared',
+              lower: [],
+              upper: [isShared],
+              includeUpper: false,
+            ));
+      }
     });
   }
 }
@@ -889,6 +985,251 @@ extension ClipboardItemQueryFilter
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'contextualImages',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'contextualImages',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'contextualImages',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'contextualImages',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'contextualImages',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'contextualImages',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'contextualImages',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'contextualImages',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementContains(String value,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'contextualImages',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementMatches(String pattern,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'contextualImages',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'contextualImages',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'contextualImages',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'contextualImages',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'contextualImages',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'contextualImages',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'contextualImages',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'contextualImages',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contextualImagesLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'contextualImages',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
       faviconUrlIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1261,6 +1602,16 @@ extension ClipboardItemQueryFilter
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      isSharedEqualTo(bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isShared',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
       timestampEqualTo(DateTime value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -1557,6 +1908,19 @@ extension ClipboardItemQuerySortBy
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> sortByIsShared() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      sortByIsSharedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.desc);
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> sortByTimestamp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'timestamp', Sort.asc);
@@ -1675,6 +2039,19 @@ extension ClipboardItemQuerySortThenBy
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> thenByIsShared() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      thenByIsSharedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isShared', Sort.desc);
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> thenByTimestamp() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'timestamp', Sort.asc);
@@ -1724,6 +2101,13 @@ extension ClipboardItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QDistinct>
+      distinctByContextualImages() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'contextualImages');
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QDistinct> distinctByFaviconUrl(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1742,6 +2126,12 @@ extension ClipboardItemQueryWhereDistinct
       distinctByIsSensitive() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isSensitive');
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QDistinct> distinctByIsShared() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isShared');
     });
   }
 
@@ -1785,6 +2175,13 @@ extension ClipboardItemQueryProperty
     });
   }
 
+  QueryBuilder<ClipboardItem, List<String>?, QQueryOperations>
+      contextualImagesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'contextualImages');
+    });
+  }
+
   QueryBuilder<ClipboardItem, String?, QQueryOperations> faviconUrlProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'faviconUrl');
@@ -1801,6 +2198,12 @@ extension ClipboardItemQueryProperty
   QueryBuilder<ClipboardItem, bool, QQueryOperations> isSensitiveProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isSensitive');
+    });
+  }
+
+  QueryBuilder<ClipboardItem, bool, QQueryOperations> isSharedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isShared');
     });
   }
 

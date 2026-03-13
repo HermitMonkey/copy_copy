@@ -1,58 +1,85 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:system_tray/system_tray.dart';
+import 'package:window_manager/window_manager.dart';
 
 class SystemTrayManager {
   final SystemTray _systemTray = SystemTray();
   final Menu _menu = Menu();
-  late Function onOpenDashboard;
 
   Future<void> init({
-    required Function onOpenDashboard,
+    required VoidCallback onOpenDashboard,
     required List<String> history,
   }) async {
-    this.onOpenDashboard = onOpenDashboard;
     await _systemTray.initSystemTray(
-      title: "Copy-Copy",
-      iconPath: 'assets/app_icon.png',
+      title:
+          "copy_copy", // 🛠 FIX 1: Removed emoji to fix macOS hit-box/rendering bugs
+      iconPath: '',
     );
-    await updateMenu(history);
 
-    _systemTray.registerSystemTrayEventHandler((eventName) {
-      if (eventName == kSystemTrayEventClick) _systemTray.popUpContextMenu();
+    // 🛠 FIX 2: Restoring proper OS-specific click mechanisms
+    _systemTray.registerSystemTrayEventHandler((eventName) async {
+      if (eventName == kSystemTrayEventClick) {
+        // macOS Standard: Left-Click ALWAYS drops down the menu.
+        Platform.isWindows
+            ? await _toggleWindow()
+            : await _systemTray.popUpContextMenu();
+      } else if (eventName == kSystemTrayEventRightClick) {
+        // macOS Standard: Right-Click can toggle the window.
+        Platform.isWindows
+            ? await _systemTray.popUpContextMenu()
+            : await _toggleWindow();
+      }
     });
   }
 
-  Future<void> updateMenu(List<String> history) async {
-    List<MenuItemBase> items = [
+  // Extracted window toggle logic for cleaner code
+  Future<void> _toggleWindow() async {
+    bool isVisible = await windowManager.isVisible();
+    if (isVisible) {
+      await windowManager.hide();
+    } else {
+      await windowManager.show();
+      await windowManager.focus();
+    }
+  }
+
+  Future<void> updateMenu(List<String> items) async {
+    bool isVisible = await windowManager.isVisible();
+
+    List<MenuItemBase> menuItems = [
       MenuItemLabel(
-        label: 'Open Phoenix Board',
-        onClicked: (i) => onOpenDashboard(),
+        // 🧠 DYNAMIC TEXT LOGIC: Updates based on current window state
+        label: isVisible ? 'Close Phoenix Dashboard' : 'Open Phoenix Dashboard',
+        onClicked: (menuItem) async {
+          await _toggleWindow();
+          await updateMenu(items); // Refresh menu text after click
+        },
       ),
       MenuSeparator(),
     ];
 
-    for (var clip in history) {
-      String display = clip.length > 30
-          ? "${clip.substring(0, 27).replaceAll('\n', ' ')}..."
-          : clip.replaceAll('\n', ' ');
-      items.add(
+    for (String item in items) {
+      menuItems.add(
         MenuItemLabel(
-          label: display,
-          onClicked: (i) async {
-            await Clipboard.setData(ClipboardData(text: clip));
+          // 🛠 FIX 3: Truncate long text so your menu doesn't stretch infinitely!
+          label: item.length > 40 ? '${item.substring(0, 40)}...' : item,
+          onClicked: (menuItem) {
+            Clipboard.setData(ClipboardData(text: item));
           },
         ),
       );
     }
 
-    items.addAll([
+    menuItems.addAll([
       MenuSeparator(),
-      MenuItemLabel(label: 'Exit Copy-Copy', onClicked: (i) => exitApp()),
+      MenuItemLabel(
+        label: 'Quit copy_copy',
+        onClicked: (menuItem) => windowManager.destroy(),
+      ),
     ]);
 
-    await _menu.buildFrom(items);
+    await _menu.buildFrom(menuItems);
     await _systemTray.setContextMenu(_menu);
   }
-
-  void exitApp() => SystemChannels.platform.invokeMethod('SystemNavigator.pop');
 }

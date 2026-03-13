@@ -1,19 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:isar/isar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:clipboard_watcher/clipboard_watcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
-import 'package:system_tray/system_tray.dart';
-import 'services/encryption_service.dart';
-
-import 'firebase_options.dart';
-import 'services/firestore_sync_service.dart';
+import 'services/app_initialization_service.dart';
 import 'services/clipboard_classifier.dart';
 import 'services/clipboard_enricher.dart';
+import 'services/firestore_sync_service.dart';
 import 'models/clipboard_item.dart';
 import 'phoenix_board.dart';
 import 'system_tray_manager.dart';
@@ -23,51 +18,10 @@ late Isar isar;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize Window & Hotkey Managers
-  await windowManager.ensureInitialized();
-  await hotKeyManager.unregisterAll();
-
-  WindowOptions windowOptions = const WindowOptions(
-    size: Size(1100, 750),
-    center: true,
-    backgroundColor: Colors.transparent,
-    skipTaskbar: false,
-    titleBarStyle: TitleBarStyle
-        .hidden, // Hides the native macOS title bar for a cleaner look
-  );
-
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.show(); // 🛠 FIX: Change from hide() to show()
-    await windowManager.focus(); // Bring to the absolute front
-  });
-
-  // 2. Register Global Hotkey: CMD + SHIFT + V
-  HotKey hotKey = HotKey(
-    key: PhysicalKeyboardKey.keyV,
-    modifiers: [HotKeyModifier.meta, HotKeyModifier.shift],
-    scope: HotKeyScope.system,
-  );
-
-  await hotKeyManager.register(
-    hotKey,
-    keyDownHandler: (hotKey) async {
-      bool isVisible = await windowManager.isVisible();
-      if (isVisible) {
-        await windowManager.hide();
-      } else {
-        await windowManager.show();
-        await windowManager.focus(); // Forces the window to the absolute front
-      }
-    },
-  );
-
-  // 3. Initialize Firebase & Security
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await EncryptionService.init();
-  await FirestoreSyncService.authenticate();
-
-  final dir = await getApplicationDocumentsDirectory();
-  isar = await Isar.open([ClipboardItemSchema], directory: dir.path);
+  // Initialize all application components in order
+  await AppInitializationService.initializeWindowManager();
+  await AppInitializationService.initializeFirebaseAndSecurity();
+  isar = await AppInitializationService.initializeIsarDatabase();
 
   runApp(const CopyCopyApp());
 }
@@ -79,7 +33,6 @@ class CopyCopyApp extends StatefulWidget {
 }
 
 class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
-  final AppWindow _appWindow = AppWindow();
   final SystemTrayManager _trayManager = SystemTrayManager();
 
   final List<ClipboardItem> _clipboardHistory = [];
@@ -91,12 +44,49 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
   @override
   void initState() {
     super.initState();
-    _trayManager.init(onOpenDashboard: () => _appWindow.show(), history: []);
+    _trayManager.init(
+      onOpenDashboard: () => windowManager.show(),
+      history: [],
+    ); // Changed _appWindow to windowManager
     clipboardWatcher.addListener(this);
     clipboardWatcher.start();
 
     _loadSettingsAndHistory(); // Loads user preferences first!
-    Future.delayed(const Duration(milliseconds: 500), () => _appWindow.hide());
+    _registerGlobalHotkey(); // ✨ Register hotkey with access to tray manager
+    Future.delayed(
+      const Duration(milliseconds: 500),
+      () => windowManager.hide(),
+    );
+  }
+
+  /// Register the global hotkey (CMD + SHIFT + V) with access to app state
+  Future<void> _registerGlobalHotkey() async {
+    await hotKeyManager.unregisterAll();
+
+    final hotKey = HotKey(
+      key: PhysicalKeyboardKey.keyV,
+      modifiers: [HotKeyModifier.meta, HotKeyModifier.shift],
+      scope: HotKeyScope.system,
+    );
+
+    await hotKeyManager.register(
+      hotKey,
+      keyDownHandler: (hotKey) async {
+        final isVisible = await windowManager.isVisible();
+        if (isVisible) {
+          await windowManager.hide();
+        } else {
+          await windowManager.show();
+          await windowManager.focus();
+        }
+
+        // 🧠 MAGIC: Now the hotkey can talk to the tray manager and update it!
+        final textHistory = _clipboardHistory
+            .map((item) => item.content)
+            .toList();
+        await _trayManager.updateMenu(textHistory);
+      },
+    );
   }
 
   // --- NEW: Preference Loader ---
@@ -230,7 +220,7 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
       ),
       home: PhoenixBoard(
         history: _clipboardHistory,
-        onHide: () => _appWindow.hide(),
+        onHide: () => windowManager.hide(),
         currentThemeMode: _themeMode,
         onThemeChanged: _setTheme,
         // --- NEW: Pass state to Dashboard ---

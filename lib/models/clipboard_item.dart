@@ -6,7 +6,7 @@ part 'clipboard_item.g.dart';
 class ClipboardItem {
   Id id = Isar.autoIncrement;
 
-  @Index() // 👈 ADD THIS LINE
+  @Index()
   late String content;
 
   @Index()
@@ -17,6 +17,11 @@ class ClipboardItem {
   String? articleText;
   String? contentType;
   String? heroImageUrl;
+  List<String>? contextualImages;
 
   bool isSensitive = false;
+
+  // 🛠 NEW: Tracks if this item has been shared externally
+  @Index()
+  bool isShared = false;
 }

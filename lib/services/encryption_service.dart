@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
@@ -39,8 +38,7 @@ class EncryptionService {
       } catch (e) {
         // Fallback to SharedPreferences if macOS blocks it
         final prefs = await SharedPreferences.getInstance();
-        // 🛠 FIX 2: Added the "!" to satisfy Dart's strict null safety
-        await prefs.setString(_keyAlias, base64Key!);
+        await prefs.setString(_keyAlias, base64Key);
         print(
           "🔓 New AES-256 Key saved to SharedPreferences (Dev Mode Fallback).",
         );

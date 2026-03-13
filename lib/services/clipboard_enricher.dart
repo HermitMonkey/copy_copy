@@ -75,12 +75,19 @@ class ClipboardEnricher {
                     ?.attributes['content'];
 
             // 3. Scrape Clean Content
-            // Remove noise before extracting text
             document
                 .querySelectorAll(
                   'script, style, nav, footer, header, aside, noscript, .ads, .comments',
                 )
                 .forEach((e) => e.remove());
+
+            // 🧠 NON-AI INTELLIGENCE: Preserve Paragraph Breaks
+            // Inject double newlines at the end of block elements before extracting text
+            document
+                .querySelectorAll('p, br, h1, h2, h3, h4, h5, li, div')
+                .forEach((e) {
+                  e.append(html_parser.parseFragment('\n\n'));
+                });
 
             var articleNode =
                 document.querySelector('article') ??
@@ -89,13 +96,18 @@ class ClipboardEnricher {
                 document.body;
 
             if (articleNode != null) {
-              // Convert multiple spaces/newlines into a single clean block for the Magazine View
-              cleanArticleText = articleNode.text
-                  .replaceAll(RegExp(r'\s+'), ' ')
+              // 1. Extract the text with our newly injected newlines
+              String rawText = articleNode.text;
+
+              // 2. Clean horizontal whitespace (spaces, tabs) but PRESERVE newlines
+              rawText = rawText.replaceAll(RegExp(r'[ \t]+'), ' ');
+
+              // 3. Collapse 3+ newlines into exactly 2 newlines (a perfect paragraph break)
+              cleanArticleText = rawText
+                  .replaceAll(RegExp(r'\n\s*\n+'), '\n\n')
                   .trim();
 
-              // Only keep if it's substantial
-              if (cleanArticleText!.length < 100) cleanArticleText = null;
+              if (cleanArticleText.length < 100) cleanArticleText = null;
             }
           }
         } catch (e) {

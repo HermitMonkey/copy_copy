@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_windows
   clipboard_watcher
   cloud_firestore
   firebase_auth
