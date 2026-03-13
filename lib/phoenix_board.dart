@@ -28,18 +28,16 @@ class PhoenixBoard extends StatefulWidget {
 
 class _PhoenixBoardState extends State<PhoenixBoard> {
   ClipboardItem? _selectedItem;
-  bool _isInspecting = false;
 
   void _selectItemAndInspect(ClipboardItem item) {
     setState(() {
       _selectedItem = item;
-      _isInspecting = true;
     });
   }
 
   void _backToDashboard() {
     setState(() {
-      _isInspecting = false;
+      _selectedItem = null;
     });
   }
 
@@ -65,8 +63,6 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const Divider(height: 32),
-
-            // --- THEME SETTINGS ---
             const Text(
               "Appearance",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -92,14 +88,11 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
                   ),
                 ],
                 selected: {widget.currentThemeMode},
-                onSelectionChanged: (Set<ThemeMode> newSelection) {
-                  widget.onThemeChanged(newSelection.first);
-                },
+                onSelectionChanged: (Set<ThemeMode> newSelection) =>
+                    widget.onThemeChanged(newSelection.first),
               ),
             ),
             const SizedBox(height: 32),
-
-            // --- TRAY MENU SETTINGS ---
             const Text(
               "System Tray Menu",
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -109,44 +102,16 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
               child: SegmentedButton<int>(
                 segments: const [
                   ButtonSegment(value: 8, label: Text("8 Items")),
+                  ButtonSegment(value: 15, label: Text("15 Items")),
                   ButtonSegment(value: 55, label: Text("55 Items")),
-                  ButtonSegment(value: 144, label: Text("144 Items")),
                 ],
-                // SAFETY NET: Default to 8 if the saved value isn't an exact match
                 selected: {
-                  {8, 55, 144}.contains(widget.currentTrayLimit)
+                  {8, 15, 55}.contains(widget.currentTrayLimit)
                       ? widget.currentTrayLimit
-                      : 8,
+                      : 15,
                 },
-                onSelectionChanged: (Set<int> newSelection) {
-                  widget.onTrayLimitChanged(newSelection.first);
-                },
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white10
-                    : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.blueGrey),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      "The system tray only displays your most recent clips for quick pasting. Open this Phoenix Board to view, search, and analyze your entire history.",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.blueGrey,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ),
-                ],
+                onSelectionChanged: (Set<int> newSelection) =>
+                    widget.onTrayLimitChanged(newSelection.first),
               ),
             ),
           ],
@@ -155,105 +120,218 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
     );
   }
 
-  Future<void> _shareTo(String platform, ClipboardItem item) async {
-    String titleStr = item.title != null ? "${item.title}\n\n" : "";
-    String rawText = "Check out this research: \n$titleStr${item.content}";
-    String encodedText = Uri.encodeComponent(rawText);
-    String encodedUrl = Uri.encodeComponent(item.content);
-
-    Uri? uri;
-    switch (platform) {
-      case 'whatsapp':
-        uri = Uri.parse("whatsapp://send?text=$encodedText");
-        break;
-      case 'telegram':
-        uri = Uri.parse(
-          "https://t.me/share/url?url=$encodedUrl&text=${Uri.encodeComponent("Check out this research: $titleStr")}",
-        );
-        break;
-      case 'x':
-        uri = Uri.parse("https://twitter.com/intent/tweet?text=$encodedText");
-        break;
-      case 'email':
-        uri = Uri.parse("mailto:?subject=Research Clip&body=$encodedText");
-        break;
-    }
-
-    if (uri != null) {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        print("Could not launch $platform.");
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark
+          ? const Color(0xFF0F0F11)
+          : const Color(0xFFF4F5F7),
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              switchInCurve: Curves.easeOutQuart,
-              switchOutCurve: Curves.easeInQuart,
-              layoutBuilder:
-                  (Widget? currentChild, List<Widget> previousChildren) {
-                    return Stack(
-                      alignment: Alignment.topCenter,
-                      children: <Widget>[
-                        ...previousChildren,
-                        if (currentChild != null) currentChild,
-                      ],
-                    );
-                  },
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: ScaleTransition(
-                    scale: Tween<double>(
-                      begin: 0.98,
-                      end: 1.0,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                );
-              },
-              child: _isInspecting
-                  ? _buildContextualInspector(context, isDark)
-                  : _buildGlobalDashboard(context, isDark),
-            ),
-          ),
-
-          VerticalDivider(
-            width: 1,
-            thickness: 1,
-            color: isDark ? Colors.white10 : Colors.black12,
-          ),
-
+          // LEFT SIDEBAR: The Navigation & History
           Container(
-            width: MediaQuery.of(context).size.width > 800 ? 280 : 200,
-            color: isDark ? Colors.black26 : const Color(0xFFF9F9FB),
+            width: 280,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF161618) : Colors.white,
+              border: Border(
+                right: BorderSide(
+                  color: isDark ? Colors.white10 : Colors.black12,
+                ),
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(24, 40, 24, 20),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.layers_outlined,
+                        color: Colors.deepPurpleAccent,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        "copy_copy",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 20,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 8,
+                  ),
                   child: Text(
-                    "RAW PASTES",
+                    "RAW FEED",
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 10,
-                      color: isDark ? Colors.deepPurple[200] : Colors.blueGrey,
+                      letterSpacing: 1.5,
+                      color: isDark ? Colors.white38 : Colors.black38,
                     ),
                   ),
                 ),
                 Expanded(child: _buildVaultList(isDark)),
+                _buildSidebarFooter(isDark),
+              ],
+            ),
+          ),
+
+          // MAIN STAGE: Dashboard or Magazine Reader
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: _selectedItem == null
+                  ? _buildGlobalDashboard(context, isDark)
+                  : _buildContextualInspector(context, isDark),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSidebarFooter(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.settings_outlined, size: 20),
+            onPressed: () => _showSettings(context),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.close_fullscreen_outlined, size: 20),
+            onPressed: widget.onHide,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlobalDashboard(BuildContext context, bool isDark) {
+    return SingleChildScrollView(
+      key: const ValueKey("dashboard"),
+      padding: const EdgeInsets.all(48),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Workspace",
+            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 40),
+          _buildActivityCard(isDark),
+          const SizedBox(height: 48),
+          Text(
+            "COLLECTIONS",
+            style: TextStyle(
+              letterSpacing: 1.5,
+              fontWeight: FontWeight.bold,
+              color: isDark ? Colors.white38 : Colors.black38,
+              fontSize: 11,
+            ),
+          ),
+          const SizedBox(height: 20),
+          GridView.count(
+            crossAxisCount: MediaQuery.of(context).size.width > 1000 ? 3 : 2,
+            shrinkWrap: true,
+            crossAxisSpacing: 20,
+            mainAxisSpacing: 20,
+            childAspectRatio: 1.6,
+            children: [
+              _buildFolderCard(
+                "Medical Research",
+                "12 items",
+                Icons.science_outlined,
+                Colors.blue,
+                isDark,
+              ),
+              _buildFolderCard(
+                "Engineering",
+                "8 items",
+                Icons.terminal_outlined,
+                Colors.green,
+                isDark,
+              ),
+              _buildFolderCard(
+                "Travel",
+                "3 items",
+                Icons.explore_outlined,
+                Colors.orange,
+                isDark,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityCard(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 140,
+                height: 140,
+                child: CircularProgressIndicator(
+                  value: 0.7,
+                  strokeWidth: 12,
+                  backgroundColor: isDark ? Colors.white10 : Colors.black12,
+                  color: Colors.deepPurpleAccent,
+                ),
+              ),
+              Text(
+                "${widget.history.length}\nClips",
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 64),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Clipboard Metrics",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+                ),
+                const SizedBox(height: 24),
+                _buildStatLine(
+                  "Captured Links",
+                  "42%",
+                  Colors.deepPurpleAccent,
+                ),
+                _buildStatLine("Code Snippets", "35%", Colors.green),
+                _buildStatLine("Plain Text", "23%", Colors.orange),
               ],
             ),
           ),
@@ -262,70 +340,226 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
     );
   }
 
-  Widget _buildGlobalDashboard(BuildContext context, bool isDark) {
-    final categories = [
-      "War News",
-      "Interesting Hotels",
-      "Food & Dining",
-      "Clothing",
-    ];
-    return SingleChildScrollView(
-      key: const ValueKey("dashboard"),
+  Widget _buildStatLine(String label, String val, Color col) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: col, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 12),
+          Text(label, style: const TextStyle(fontSize: 14)),
+          const Spacer(),
+          Text(val, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContextualInspector(BuildContext context, bool isDark) {
+    final item = _selectedItem!;
+    return Column(
+      key: const ValueKey("inspector"),
+      children: [
+        _buildMinimalToolbar(item, isDark),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (item.heroImageUrl != null)
+                  _buildHeroHeader(item.heroImageUrl!)
+                else
+                  const SizedBox(height: 40),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 48,
+                    vertical: 20,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title ?? "Copied Content",
+                        style: TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -1,
+                          height: 1.1,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _buildDetailedInfoBar(item, isDark),
+                      const SizedBox(height: 32),
+                      const Divider(thickness: 0.5),
+                      const SizedBox(height: 40),
+                      Text(
+                        item.articleText ?? item.content,
+                        style: TextStyle(
+                          fontSize: 19,
+                          height: 1.75,
+                          fontFamily: 'Georgia',
+                          color: isDark
+                              ? Colors.white.withOpacity(0.85)
+                              : Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 80),
+                      _buildSourceFooter(item, isDark),
+                      const SizedBox(height: 60),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeroHeader(String url) {
+    return Container(
+      height: 350,
+      width: double.infinity,
+      foregroundDecoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            const Color(0xFF0F0F11).withOpacity(1),
+            const Color(0xFF0F0F11).withOpacity(0),
+          ],
+        ),
+      ),
+      child: Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  Widget _buildMinimalToolbar(ClipboardItem item, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+            onPressed: _backToDashboard,
+          ),
+          const Spacer(),
+          _buildSlimButton(
+            Icons.copy_rounded,
+            "Copy",
+            () => Clipboard.setData(ClipboardData(text: item.content)),
+          ),
+          const SizedBox(width: 12),
+          if (item.contentType == 'url')
+            _buildSlimButton(
+              Icons.open_in_new_rounded,
+              "Source",
+              () => _openInBrowser(item.content),
+            ),
+          const SizedBox(width: 12),
+          _buildShareMenu(item, isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSlimButton(IconData icon, String label, VoidCallback onTap) {
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 16, color: Colors.deepPurpleAccent),
+      label: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.deepPurpleAccent,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+      ),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        backgroundColor: Colors.deepPurpleAccent.withOpacity(0.1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
+  }
+
+  Widget _buildDetailedInfoBar(ClipboardItem item, bool isDark) {
+    return Row(
+      children: [
+        if (item.faviconUrl != null)
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Image.network(item.faviconUrl!, width: 20, height: 20),
+            ),
+          ),
+        Text(
+          (item.contentType ?? "TEXT").toUpperCase(),
+          style: const TextStyle(
+            color: Colors.deepPurpleAccent,
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
+            letterSpacing: 1,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Icon(
+          Icons.access_time,
+          size: 14,
+          color: isDark ? Colors.white30 : Colors.black38,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          item.timestamp.toString().substring(0, 16),
+          style: TextStyle(
+            color: isDark ? Colors.white30 : Colors.black38,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSourceFooter(ClipboardItem item, bool isDark) {
+    return Container(
       padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.03)
+            : Colors.black.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isDark ? Colors.white10 : Colors.black12),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildToolBar(context),
-          const SizedBox(height: 32),
-          Text(
-            "AI INSIGHTS",
+          const Text(
+            "RAW SOURCE",
             style: TextStyle(
-              letterSpacing: 1.2,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-              fontSize: 11,
+              letterSpacing: 2,
             ),
           ),
           const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 350,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-              childAspectRatio: 1.4,
-            ),
-            itemCount: categories.length,
-            itemBuilder: (context, index) => Container(
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[900] : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? Colors.white10 : Colors.grey[200]!,
-                ),
-              ),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    categories[index],
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    "Analysis pending...",
-                    style: TextStyle(
-                      color: isDark ? Colors.grey[500] : Colors.grey,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
-              ),
+          SelectableText(
+            item.content,
+            style: TextStyle(
+              fontFamily: 'Courier',
+              fontSize: 13,
+              color: isDark ? Colors.white54 : Colors.black54,
             ),
           ),
         ],
@@ -333,319 +567,130 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
     );
   }
 
-  Widget _buildContextualInspector(BuildContext context, bool isDark) {
-    if (_selectedItem == null) return const SizedBox.shrink();
-    final item = _selectedItem!;
-
-    Widget contentLayout;
-    if (item.content.contains('pubmed.ncbi.nlm.nih.gov')) {
-      contentLayout = _buildPubMedLayout(item, isDark);
-    } else if (item.content.contains('youtube.com') ||
-        item.content.contains('youtu.be')) {
-      contentLayout = _buildYouTubeLayout(item, isDark);
-    } else {
-      contentLayout = _buildStandardLayout(item, isDark);
-    }
-
-    return Column(
-      key: const ValueKey("inspector"),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          child: Row(
-            children: [
-              TextButton.icon(
-                onPressed: _backToDashboard,
-                icon: const Icon(Icons.arrow_back, size: 16),
-                label: const Text("Dashboard"),
-                style: TextButton.styleFrom(
-                  foregroundColor: isDark ? Colors.grey[300] : Colors.grey[700],
-                ),
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: "Copy to Clipboard",
-                icon: const Icon(Icons.copy, size: 18),
-                onPressed: () =>
-                    Clipboard.setData(ClipboardData(text: item.content)),
-              ),
-              if (item.contentType == 'url')
-                IconButton(
-                  tooltip: "Open in Browser",
-                  icon: const Icon(Icons.open_in_browser, size: 18),
-                  onPressed: () => _openInBrowser(item.content),
-                ),
-              PopupMenuButton<String>(
-                tooltip: "Share Research",
-                icon: const Icon(
-                  Icons.ios_share,
-                  size: 18,
-                  color: Colors.blueAccent,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                color: isDark ? const Color(0xFF2A2A2E) : Colors.white,
-                elevation: 8,
-                onSelected: (value) => _shareTo(value, item),
-                itemBuilder: (context) => <PopupMenuEntry<String>>[
-                  const PopupMenuItem(
-                    value: 'whatsapp',
-                    child: ListTile(
-                      leading: FaIcon(
-                        FontAwesomeIcons.whatsapp,
-                        color: Color(0xFF25D366),
-                        size: 20,
-                      ),
-                      title: Text('WhatsApp', style: TextStyle(fontSize: 14)),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'telegram',
-                    child: ListTile(
-                      leading: FaIcon(
-                        FontAwesomeIcons.telegram,
-                        color: Color(0xFF0088cc),
-                        size: 20,
-                      ),
-                      title: Text('Telegram', style: TextStyle(fontSize: 14)),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  PopupMenuItem(
-                    value: 'x',
-                    child: ListTile(
-                      leading: FaIcon(
-                        FontAwesomeIcons.xTwitter,
-                        color: isDark ? Colors.white : Colors.black,
-                        size: 20,
-                      ),
-                      title: const Text(
-                        'X (Twitter)',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'email',
-                    child: ListTile(
-                      leading: FaIcon(
-                        FontAwesomeIcons.solidEnvelope,
-                        color: Colors.redAccent,
-                        size: 20,
-                      ),
-                      title: Text('Email', style: TextStyle(fontSize: 14)),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+  Widget _buildShareMenu(ClipboardItem item, bool isDark) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.share_outlined, size: 20),
+      onSelected: (val) => print("Sharing to $val"),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'ws',
+          child: ListTile(
+            leading: Icon(Icons.message, color: Colors.green),
+            title: Text("WhatsApp"),
           ),
         ),
-
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    item.contentType == 'url' ? Icons.link : Icons.notes,
-                    size: 24,
-                    color: Colors.deepPurple,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      item.title ?? "Inspector",
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                item.content,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.blue[300]),
-              ),
-              const SizedBox(height: 24),
-              contentLayout,
-            ],
+        const PopupMenuItem(
+          value: 'tg',
+          child: ListTile(
+            leading: Icon(Icons.telegram, color: Colors.blue),
+            title: Text("Telegram"),
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'x',
+          child: ListTile(
+            leading: Icon(Icons.close),
+            title: Text("X (Twitter)"),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildPubMedLayout(ClipboardItem item, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ElevatedButton.icon(
-          icon: const Icon(Icons.picture_as_pdf, size: 16),
-          label: const Text("Find PDF"),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red[700],
-            foregroundColor: Colors.white,
+  Widget _buildFolderCard(
+    String title,
+    String subtitle,
+    dynamic icon,
+    Color color,
+    bool isDark,
+  ) {
+    Widget iconWidget = icon is FaIconData
+        ? FaIcon(icon, color: color, size: 22)
+        : Icon(icon, color: color, size: 22);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: iconWidget,
           ),
-          onPressed: () => _openInBrowser(item.content),
-        ),
-        const SizedBox(height: 24),
-        const Text(
-          "ABSTRACT / SCRAPED DATA",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-            letterSpacing: 1.2,
+          const Spacer(),
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          item.articleText ?? "No abstract scraped. Wait for background task.",
-          style: const TextStyle(fontSize: 14, height: 1.6),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildYouTubeLayout(ClipboardItem item, bool isDark) {
-    final regExp = RegExp(
-      r'(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})',
-      caseSensitive: false,
-    );
-    final videoId = regExp.firstMatch(item.content)?.group(1);
-
-    if (videoId == null) return const SizedBox.shrink();
-
-    return GestureDetector(
-      onTap: () => _openInBrowser(item.content),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: AspectRatio(
-          aspectRatio: 16 / 9,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Image.network(
-                'https://img.youtube.com/vi/$videoId/maxresdefault.jpg',
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(color: Colors.black),
-              ),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.7),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 48,
-                ),
-              ),
-            ],
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: isDark ? Colors.white38 : Colors.black38,
+              fontSize: 12,
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildStandardLayout(ClipboardItem item, bool isDark) {
-    return Text(
-      item.articleText ?? item.content,
-      style: const TextStyle(fontSize: 14, height: 1.6),
-    );
-  }
-
-  Widget _buildToolBar(BuildContext context) {
-    return Row(
-      children: [
-        const Text(
-          "Phoenix Board",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-        ),
-        const Spacer(),
-        ElevatedButton.icon(
-          onPressed: () => print("🚀 Triggering AI..."),
-          icon: const Icon(Icons.auto_awesome, size: 14),
-          label: const Text("Run AI", style: TextStyle(fontSize: 12)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.deepPurple,
-            foregroundColor: Colors.white,
-          ),
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings_outlined, size: 20),
-          onPressed: () => _showSettings(context),
-        ),
-        IconButton(
-          icon: const Icon(Icons.close, size: 20),
-          onPressed: widget.onHide,
-        ),
-      ],
-    );
-  }
-
   Widget _buildVaultList(bool isDark) {
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
       itemCount: widget.history.length,
-      separatorBuilder: (context, index) =>
-          Divider(height: 1, color: isDark ? Colors.white10 : Colors.black12),
       itemBuilder: (context, index) {
         final item = widget.history[index];
-        final String timeStr =
-            "${item.timestamp.hour.toString().padLeft(2, '0')}:${item.timestamp.minute.toString().padLeft(2, '0')}";
-
-        return ListTile(
-          dense: true,
-          selected: _selectedItem?.id == item.id && _isInspecting,
-          selectedTileColor: isDark ? Colors.white10 : Colors.black12,
-          leading: item.contentType == 'url'
-              ? (item.faviconUrl != null
-                    ? Image.network(
-                        item.faviconUrl!,
-                        width: 16,
-                        height: 16,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.link,
-                          size: 16,
-                          color: Colors.blue,
-                        ),
-                      )
-                    : const Icon(Icons.link, size: 16, color: Colors.blue))
-              : (item.contentType == 'code'
-                    ? const Icon(Icons.code, size: 16, color: Colors.green)
-                    : const Icon(Icons.notes, size: 16, color: Colors.grey)),
-          title: Text(
-            item.title ?? item.content,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
+        final bool isSelected = _selectedItem?.id == item.id;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: ListTile(
+            dense: true,
+            selected: isSelected,
+            selectedTileColor: isDark
+                ? Colors.white.withOpacity(0.05)
+                : Colors.black.withOpacity(0.05),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            leading: item.faviconUrl != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Image.network(
+                      item.faviconUrl!,
+                      width: 18,
+                      height: 18,
+                      errorBuilder: (_, __, ___) =>
+                          const Icon(Icons.link, size: 18),
+                    ),
+                  )
+                : Icon(
+                    item.contentType == 'url' ? Icons.link : Icons.notes,
+                    size: 18,
+                    color: Colors.deepPurpleAccent,
+                  ),
+            title: Text(
+              item.title ?? "Copied Content",
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            subtitle: Text(
+              item.timestamp.toString().substring(11, 16),
+              style: const TextStyle(fontSize: 10),
+            ),
+            onTap: () => _selectItemAndInspect(item),
           ),
-          subtitle: Text(
-            timeStr,
-            style: const TextStyle(fontSize: 9, color: Colors.blueGrey),
-          ),
-          trailing: item.articleText != null
-              ? const Icon(
-                  Icons.article_outlined,
-                  size: 14,
-                  color: Colors.deepPurple,
-                )
-              : null,
-          onTap: () => _selectItemAndInspect(item),
         );
       },
     );

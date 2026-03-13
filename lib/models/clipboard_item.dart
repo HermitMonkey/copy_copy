@@ -6,18 +6,17 @@ part 'clipboard_item.g.dart';
 class ClipboardItem {
   Id id = Isar.autoIncrement;
 
-  @Index(type: IndexType.hash)
+  @Index() // 👈 ADD THIS LINE
   late String content;
 
+  @Index()
   late DateTime timestamp;
-
-  late bool isSensitive;
-  late String contentType;
 
   String? title;
   String? faviconUrl;
-
-  // --- NEW: THE SCRAPED ARTICLE TEXT ---
-  @Index(type: IndexType.value) // Indexed so we can quickly search it later!
   String? articleText;
+  String? contentType;
+  String? heroImageUrl;
+
+  bool isSensitive = false;
 }

@@ -1,4 +1,4 @@
-import 'dart:convert'; // NEW IMPORT
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:html/parser.dart' as html_parser;
 import 'package:isar/isar.dart';
@@ -19,14 +19,14 @@ class ClipboardEnricher {
       if (uri == null) return;
 
       String favicon =
-          'https://www.google.com/s2/favicons?domain=${uri.host}&sz=64';
+          'https://www.google.com/s2/favicons?domain=${uri.host}&sz=128';
       String? pageTitle;
       String? cleanArticleText;
+      String? heroImageUrl;
 
       // --- THE YOUTUBE FAST-PATH ---
       if (uri.host.contains('youtube.com') || uri.host.contains('youtu.be')) {
         try {
-          // Use YouTube's official oEmbed API to bypass scraping blockers
           final oembedUrl = Uri.parse(
             'https://www.youtube.com/oembed?url=$url&format=json',
           );
@@ -35,13 +35,14 @@ class ClipboardEnricher {
               .timeout(const Duration(seconds: 3));
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-            pageTitle = data['title']; // Instantly gets the real video title!
+            pageTitle = data['title'];
+            heroImageUrl = data['thumbnail_url']; // High-res YT thumbnail
           }
         } catch (e) {
-          print("YouTube oEmbed failed: $e");
+          print("YouTube enrichment failed: $e");
         }
       }
-      // --- NORMAL ARTICLE SCRAPING ---
+      // --- GENERAL WEB SCRAPING ---
       else {
         try {
           final response = await http
@@ -56,39 +57,61 @@ class ClipboardEnricher {
 
           if (response.statusCode == 200) {
             final document = html_parser.parse(response.body);
-            pageTitle = document.querySelector('title')?.text.trim();
 
+            // 1. Scrape Title
+            pageTitle =
+                document
+                    .querySelector('meta[property="og:title"]')
+                    ?.attributes['content'] ??
+                document.querySelector('title')?.text.trim();
+
+            // 2. Scrape Hero Image (OpenGraph / Twitter Cards)
+            heroImageUrl =
+                document
+                    .querySelector('meta[property="og:image"]')
+                    ?.attributes['content'] ??
+                document
+                    .querySelector('meta[name="twitter:image"]')
+                    ?.attributes['content'];
+
+            // 3. Scrape Clean Content
+            // Remove noise before extracting text
             document
                 .querySelectorAll(
-                  'script, style, nav, footer, header, aside, noscript, iframe, form',
+                  'script, style, nav, footer, header, aside, noscript, .ads, .comments',
                 )
                 .forEach((e) => e.remove());
+
             var articleNode =
                 document.querySelector('article') ??
                 document.querySelector('main') ??
+                document.querySelector('[role="main"]') ??
                 document.body;
 
             if (articleNode != null) {
+              // Convert multiple spaces/newlines into a single clean block for the Magazine View
               cleanArticleText = articleNode.text
                   .replaceAll(RegExp(r'\s+'), ' ')
                   .trim();
-              if (cleanArticleText!.length < 50) cleanArticleText = null;
+
+              // Only keep if it's substantial
+              if (cleanArticleText!.length < 100) cleanArticleText = null;
             }
           }
         } catch (e) {
-          print("Enricher Network Notice: Could not scrape $url. Error: $e");
+          print("Enricher failed to scrape $url: $e");
         }
       }
 
-      // Save to database
+      // Save findings back to Isar
       await isar.writeTxn(() async {
         final latestItem = await isar.clipboardItems.get(itemId);
         if (latestItem != null) {
           latestItem.faviconUrl = favicon;
-          if (pageTitle != null && pageTitle.isNotEmpty)
-            latestItem.title = pageTitle;
+          if (pageTitle != null) latestItem.title = pageTitle;
           if (cleanArticleText != null)
             latestItem.articleText = cleanArticleText;
+          if (heroImageUrl != null) latestItem.heroImageUrl = heroImageUrl;
           await isar.clipboardItems.put(latestItem);
         }
       });

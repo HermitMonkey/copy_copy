@@ -37,18 +37,23 @@ const ClipboardItemSchema = CollectionSchema(
       name: r'faviconUrl',
       type: IsarType.string,
     ),
-    r'isSensitive': PropertySchema(
+    r'heroImageUrl': PropertySchema(
       id: 4,
+      name: r'heroImageUrl',
+      type: IsarType.string,
+    ),
+    r'isSensitive': PropertySchema(
+      id: 5,
       name: r'isSensitive',
       type: IsarType.bool,
     ),
     r'timestamp': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'title': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'title',
       type: IsarType.string,
     )
@@ -72,16 +77,16 @@ const ClipboardItemSchema = CollectionSchema(
         )
       ],
     ),
-    r'articleText': IndexSchema(
-      id: 8874770928607843865,
-      name: r'articleText',
+    r'timestamp': IndexSchema(
+      id: 1852253767416892198,
+      name: r'timestamp',
       unique: false,
       replace: false,
       properties: [
         IndexPropertySchema(
-          name: r'articleText',
+          name: r'timestamp',
           type: IndexType.value,
-          caseSensitive: true,
+          caseSensitive: false,
         )
       ],
     )
@@ -107,9 +112,20 @@ int _clipboardItemEstimateSize(
     }
   }
   bytesCount += 3 + object.content.length * 3;
-  bytesCount += 3 + object.contentType.length * 3;
+  {
+    final value = object.contentType;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   {
     final value = object.faviconUrl;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.heroImageUrl;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
     }
@@ -133,9 +149,10 @@ void _clipboardItemSerialize(
   writer.writeString(offsets[1], object.content);
   writer.writeString(offsets[2], object.contentType);
   writer.writeString(offsets[3], object.faviconUrl);
-  writer.writeBool(offsets[4], object.isSensitive);
-  writer.writeDateTime(offsets[5], object.timestamp);
-  writer.writeString(offsets[6], object.title);
+  writer.writeString(offsets[4], object.heroImageUrl);
+  writer.writeBool(offsets[5], object.isSensitive);
+  writer.writeDateTime(offsets[6], object.timestamp);
+  writer.writeString(offsets[7], object.title);
 }
 
 ClipboardItem _clipboardItemDeserialize(
@@ -147,12 +164,13 @@ ClipboardItem _clipboardItemDeserialize(
   final object = ClipboardItem();
   object.articleText = reader.readStringOrNull(offsets[0]);
   object.content = reader.readString(offsets[1]);
-  object.contentType = reader.readString(offsets[2]);
+  object.contentType = reader.readStringOrNull(offsets[2]);
   object.faviconUrl = reader.readStringOrNull(offsets[3]);
+  object.heroImageUrl = reader.readStringOrNull(offsets[4]);
   object.id = id;
-  object.isSensitive = reader.readBool(offsets[4]);
-  object.timestamp = reader.readDateTime(offsets[5]);
-  object.title = reader.readStringOrNull(offsets[6]);
+  object.isSensitive = reader.readBool(offsets[5]);
+  object.timestamp = reader.readDateTime(offsets[6]);
+  object.title = reader.readStringOrNull(offsets[7]);
   return object;
 }
 
@@ -168,14 +186,16 @@ P _clipboardItemDeserializeProp<P>(
     case 1:
       return (reader.readString(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 3:
       return (reader.readStringOrNull(offset)) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 6:
+      return (reader.readDateTime(offset)) as P;
+    case 7:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -203,10 +223,10 @@ extension ClipboardItemQueryWhereSort
     });
   }
 
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhere> anyArticleText() {
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhere> anyTimestamp() {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
-        const IndexWhereClause.any(indexName: r'articleText'),
+        const IndexWhereClause.any(indexName: r'timestamp'),
       );
     });
   }
@@ -329,66 +349,44 @@ extension ClipboardItemQueryWhere
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextIsNull() {
+      timestampEqualTo(DateTime timestamp) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'articleText',
-        value: [null],
+        indexName: r'timestamp',
+        value: [timestamp],
       ));
     });
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextIsNotNull() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'articleText',
-        lower: [null],
-        includeLower: false,
-        upper: [],
-      ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextEqualTo(String? articleText) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'articleText',
-        value: [articleText],
-      ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextNotEqualTo(String? articleText) {
+      timestampNotEqualTo(DateTime timestamp) {
     return QueryBuilder.apply(this, (query) {
       if (query.whereSort == Sort.asc) {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'articleText',
+              indexName: r'timestamp',
               lower: [],
-              upper: [articleText],
+              upper: [timestamp],
               includeUpper: false,
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'articleText',
-              lower: [articleText],
+              indexName: r'timestamp',
+              lower: [timestamp],
               includeLower: false,
               upper: [],
             ));
       } else {
         return query
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'articleText',
-              lower: [articleText],
+              indexName: r'timestamp',
+              lower: [timestamp],
               includeLower: false,
               upper: [],
             ))
             .addWhereClause(IndexWhereClause.between(
-              indexName: r'articleText',
+              indexName: r'timestamp',
               lower: [],
-              upper: [articleText],
+              upper: [timestamp],
               includeUpper: false,
             ));
       }
@@ -396,14 +394,14 @@ extension ClipboardItemQueryWhere
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextGreaterThan(
-    String? articleText, {
+      timestampGreaterThan(
+    DateTime timestamp, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'articleText',
-        lower: [articleText],
+        indexName: r'timestamp',
+        lower: [timestamp],
         includeLower: include,
         upper: [],
       ));
@@ -411,83 +409,35 @@ extension ClipboardItemQueryWhere
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextLessThan(
-    String? articleText, {
+      timestampLessThan(
+    DateTime timestamp, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'articleText',
+        indexName: r'timestamp',
         lower: [],
-        upper: [articleText],
+        upper: [timestamp],
         includeUpper: include,
       ));
     });
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextBetween(
-    String? lowerArticleText,
-    String? upperArticleText, {
+      timestampBetween(
+    DateTime lowerTimestamp,
+    DateTime upperTimestamp, {
     bool includeLower = true,
     bool includeUpper = true,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'articleText',
-        lower: [lowerArticleText],
+        indexName: r'timestamp',
+        lower: [lowerTimestamp],
         includeLower: includeLower,
-        upper: [upperArticleText],
+        upper: [upperTimestamp],
         includeUpper: includeUpper,
       ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextStartsWith(String ArticleTextPrefix) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.between(
-        indexName: r'articleText',
-        lower: [ArticleTextPrefix],
-        upper: ['$ArticleTextPrefix\u{FFFFF}'],
-      ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'articleText',
-        value: [''],
-      ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      articleTextIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      if (query.whereSort == Sort.asc) {
-        return query
-            .addWhereClause(IndexWhereClause.lessThan(
-              indexName: r'articleText',
-              upper: [''],
-            ))
-            .addWhereClause(IndexWhereClause.greaterThan(
-              indexName: r'articleText',
-              lower: [''],
-            ));
-      } else {
-        return query
-            .addWhereClause(IndexWhereClause.greaterThan(
-              indexName: r'articleText',
-              lower: [''],
-            ))
-            .addWhereClause(IndexWhereClause.lessThan(
-              indexName: r'articleText',
-              upper: [''],
-            ));
-      }
     });
   }
 }
@@ -785,8 +735,26 @@ extension ClipboardItemQueryFilter
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contentTypeIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'contentType',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      contentTypeIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'contentType',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
       contentTypeEqualTo(
-    String value, {
+    String? value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
@@ -800,7 +768,7 @@ extension ClipboardItemQueryFilter
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
       contentTypeGreaterThan(
-    String value, {
+    String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -816,7 +784,7 @@ extension ClipboardItemQueryFilter
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
       contentTypeLessThan(
-    String value, {
+    String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -832,8 +800,8 @@ extension ClipboardItemQueryFilter
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
       contentTypeBetween(
-    String lower,
-    String upper, {
+    String? lower,
+    String? upper, {
     bool includeLower = true,
     bool includeUpper = true,
     bool caseSensitive = true,
@@ -1069,6 +1037,160 @@ extension ClipboardItemQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'faviconUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'heroImageUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'heroImageUrl',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'heroImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'heroImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'heroImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'heroImageUrl',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'heroImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'heroImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'heroImageUrl',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'heroImageUrl',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'heroImageUrl',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      heroImageUrlIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'heroImageUrl',
         value: '',
       ));
     });
@@ -1408,6 +1530,20 @@ extension ClipboardItemQuerySortBy
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      sortByHeroImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'heroImageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      sortByHeroImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'heroImageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> sortByIsSensitive() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isSensitive', Sort.asc);
@@ -1500,6 +1636,20 @@ extension ClipboardItemQuerySortThenBy
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      thenByHeroImageUrl() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'heroImageUrl', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      thenByHeroImageUrlDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'heroImageUrl', Sort.desc);
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -1581,6 +1731,13 @@ extension ClipboardItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QDistinct> distinctByHeroImageUrl(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'heroImageUrl', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QDistinct>
       distinctByIsSensitive() {
     return QueryBuilder.apply(this, (query) {
@@ -1622,7 +1779,7 @@ extension ClipboardItemQueryProperty
     });
   }
 
-  QueryBuilder<ClipboardItem, String, QQueryOperations> contentTypeProperty() {
+  QueryBuilder<ClipboardItem, String?, QQueryOperations> contentTypeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'contentType');
     });
@@ -1631,6 +1788,13 @@ extension ClipboardItemQueryProperty
   QueryBuilder<ClipboardItem, String?, QQueryOperations> faviconUrlProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'faviconUrl');
+    });
+  }
+
+  QueryBuilder<ClipboardItem, String?, QQueryOperations>
+      heroImageUrlProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'heroImageUrl');
     });
   }
 
