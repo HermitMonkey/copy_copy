@@ -3,11 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:isar/isar.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // NEW IMPORT
-import 'firebase_options.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:clipboard_watcher/clipboard_watcher.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:system_tray/system_tray.dart';
+import 'services/encryption_service.dart';
 
+import 'firebase_options.dart';
+import 'services/firestore_sync_service.dart';
 import 'services/clipboard_classifier.dart';
 import 'services/clipboard_enricher.dart';
 import 'models/clipboard_item.dart';
@@ -18,7 +22,49 @@ late Isar isar;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 1. Initialize Window & Hotkey Managers
+  await windowManager.ensureInitialized();
+  await hotKeyManager.unregisterAll();
+
+  WindowOptions windowOptions = const WindowOptions(
+    size: Size(1100, 750),
+    center: true,
+    backgroundColor: Colors.transparent,
+    skipTaskbar: false,
+    titleBarStyle: TitleBarStyle
+        .hidden, // Hides the native macOS title bar for a cleaner look
+  );
+
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show(); // 🛠 FIX: Change from hide() to show()
+    await windowManager.focus(); // Bring to the absolute front
+  });
+
+  // 2. Register Global Hotkey: CMD + SHIFT + V
+  HotKey hotKey = HotKey(
+    key: PhysicalKeyboardKey.keyV,
+    modifiers: [HotKeyModifier.meta, HotKeyModifier.shift],
+    scope: HotKeyScope.system,
+  );
+
+  await hotKeyManager.register(
+    hotKey,
+    keyDownHandler: (hotKey) async {
+      bool isVisible = await windowManager.isVisible();
+      if (isVisible) {
+        await windowManager.hide();
+      } else {
+        await windowManager.show();
+        await windowManager.focus(); // Forces the window to the absolute front
+      }
+    },
+  );
+
+  // 3. Initialize Firebase & Security
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await EncryptionService.init();
+  await FirestoreSyncService.authenticate();
 
   final dir = await getApplicationDocumentsDirectory();
   isar = await Isar.open([ClipboardItemSchema], directory: dir.path);
@@ -143,12 +189,26 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
           .where()
           .contentEqualTo(content)
           .findFirst();
-      if (newlySavedItem != null &&
-          newlySavedItem.contentType == 'url' &&
-          !newlySavedItem.isSensitive) {
-        ClipboardEnricher.enrichItem(isar, newlySavedItem.id).then((_) {
-          _loadHistoryFromDisk();
-        });
+
+      if (newlySavedItem != null) {
+        if (newlySavedItem.contentType == 'url' &&
+            !newlySavedItem.isSensitive) {
+          // If it's a URL, enrich it first, THEN sync
+          ClipboardEnricher.enrichItem(isar, newlySavedItem.id).then((_) async {
+            _loadHistoryFromDisk();
+
+            // ☁️ SYNC TO CLOUD AFTER ENRICHMENT
+            final enrichedItem = await isar.clipboardItems.get(
+              newlySavedItem.id,
+            );
+            if (enrichedItem != null) {
+              FirestoreSyncService.queueItemForSync(enrichedItem);
+            }
+          });
+        } else {
+          // ☁️ If it's just plain text or code, sync immediately
+          FirestoreSyncService.queueItemForSync(newlySavedItem);
+        }
       }
     }
   }

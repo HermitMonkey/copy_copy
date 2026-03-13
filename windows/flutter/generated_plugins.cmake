@@ -5,10 +5,15 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   clipboard_watcher
   cloud_firestore
+  firebase_auth
   firebase_core
+  flutter_secure_storage_windows
+  hotkey_manager_windows
   isar_flutter_libs
+  screen_retriever_windows
   system_tray
   url_launcher_windows
+  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
