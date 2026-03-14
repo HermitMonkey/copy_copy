@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:isar/isar.dart';
@@ -5,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:clipboard_watcher/clipboard_watcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
+import 'package:path_provider/path_provider.dart'; // 🛠 Needed for Export
 import 'services/app_initialization_service.dart';
 import 'services/clipboard_classifier.dart';
 import 'services/clipboard_enricher.dart';
@@ -17,12 +20,9 @@ late Isar isar;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize all application components in order
   await AppInitializationService.initializeWindowManager();
   await AppInitializationService.initializeFirebaseAndSecurity();
   isar = await AppInitializationService.initializeIsarDatabase();
-
   runApp(const CopyCopyApp());
 }
 
@@ -32,37 +32,44 @@ class CopyCopyApp extends StatefulWidget {
   State<CopyCopyApp> createState() => _CopyCopyAppState();
 }
 
-class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
+class _CopyCopyAppState extends State<CopyCopyApp>
+    with ClipboardListener, WindowListener {
   final SystemTrayManager _trayManager = SystemTrayManager();
-
   final List<ClipboardItem> _clipboardHistory = [];
   ThemeMode _themeMode = ThemeMode.system;
-
-  // --- NEW: Dynamic Tray Limit State ---
   int _trayLimit = 15;
 
   @override
   void initState() {
     super.initState();
-    _trayManager.init(
-      onOpenDashboard: () => windowManager.show(),
-      history: [],
-    ); // Changed _appWindow to windowManager
+    _trayManager.init(onOpenDashboard: () => windowManager.show(), history: []);
     clipboardWatcher.addListener(this);
     clipboardWatcher.start();
+    windowManager.addListener(this);
 
-    _loadSettingsAndHistory(); // Loads user preferences first!
-    _registerGlobalHotkey(); // ✨ Register hotkey with access to tray manager
+    _loadSettingsAndHistory();
+    _registerGlobalHotkey();
     Future.delayed(
       const Duration(milliseconds: 500),
       () => windowManager.hide(),
     );
   }
 
-  /// Register the global hotkey (CMD + SHIFT + V) with access to app state
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    clipboardWatcher.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  void onWindowHide() => _syncTrayMenu();
+
+  @override
+  void onWindowShow() => _syncTrayMenu();
+
   Future<void> _registerGlobalHotkey() async {
     await hotKeyManager.unregisterAll();
-
     final hotKey = HotKey(
       key: PhysicalKeyboardKey.keyV,
       modifiers: [HotKeyModifier.meta, HotKeyModifier.shift],
@@ -79,33 +86,25 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
           await windowManager.show();
           await windowManager.focus();
         }
-
-        // 🧠 MAGIC: Now the hotkey can talk to the tray manager and update it!
-        final textHistory = _clipboardHistory
-            .map((item) => item.content)
-            .toList();
-        await _trayManager.updateMenu(textHistory);
       },
     );
   }
 
-  // --- NEW: Preference Loader ---
   Future<void> _loadSettingsAndHistory() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _trayLimit = prefs.getInt('trayLimit') ?? 15; // Default to 15 if not set
+      _trayLimit = prefs.getInt('trayLimit') ?? 15;
     });
     _loadHistoryFromDisk();
   }
 
-  // --- NEW: Preference Saver ---
   Future<void> _updateTrayLimit(int newLimit) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('trayLimit', newLimit);
     setState(() {
       _trayLimit = newLimit;
     });
-    _loadHistoryFromDisk(); // Instantly update the tray when settings change
+    _loadHistoryFromDisk();
   }
 
   Future<void> _loadHistoryFromDisk() async {
@@ -113,14 +112,15 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
         .where()
         .sortByTimestampDesc()
         .findAll();
-
     setState(() {
       _clipboardHistory.clear();
       _clipboardHistory.addAll(items);
     });
+    _syncTrayMenu();
+  }
 
-    // USES THE DYNAMIC LIMIT HERE
-    final trayItems = items.take(_trayLimit).map((e) {
+  void _syncTrayMenu() {
+    final trayItems = _clipboardHistory.take(_trayLimit).map((e) {
       String displayText = e.title ?? e.content;
       displayText = displayText.replaceAll('\n', ' ').trim();
       if (displayText.length > 40) {
@@ -128,11 +128,53 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
       }
       return displayText;
     }).toList();
-
     _trayManager.updateMenu(trayItems);
   }
 
   void _setTheme(ThemeMode mode) => setState(() => _themeMode = mode);
+
+  // 🛠 NEW: Nuclear Wipe
+  Future<void> _nuclearReset() async {
+    await isar.writeTxn(() async {
+      await isar.clipboardItems.clear();
+    });
+    _loadHistoryFromDisk();
+  }
+
+  // 🛠 NEW: Data Export to Downloads Folder
+  Future<void> _exportData(BuildContext context) async {
+    try {
+      final dir = await getDownloadsDirectory();
+      if (dir != null) {
+        final file = File('${dir.path}/copy_copy_export.json');
+        final data = _clipboardHistory
+            .map(
+              (e) => {
+                'content': e.content,
+                'title': e.title,
+                'type': e.contentType,
+                'timestamp': e.timestamp.toIso8601String(),
+                'summary': e.generatedSummary,
+                'links': e.attachedPdfs,
+              },
+            )
+            .toList();
+
+        await file.writeAsString(jsonEncode(data));
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Data successfully exported to Downloads folder!"),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Export failed: $e");
+    }
+  }
 
   @override
   void onClipboardChanged() async {
@@ -167,9 +209,8 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
               .where()
               .sortByTimestamp()
               .findFirst();
-          if (oldestItem != null) {
+          if (oldestItem != null)
             await isar.clipboardItems.delete(oldestItem.id);
-          }
         }
       });
 
@@ -179,24 +220,18 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
           .where()
           .contentEqualTo(content)
           .findFirst();
-
       if (newlySavedItem != null) {
         if (newlySavedItem.contentType == 'url' &&
             !newlySavedItem.isSensitive) {
-          // If it's a URL, enrich it first, THEN sync
           ClipboardEnricher.enrichItem(isar, newlySavedItem.id).then((_) async {
             _loadHistoryFromDisk();
-
-            // ☁️ SYNC TO CLOUD AFTER ENRICHMENT
             final enrichedItem = await isar.clipboardItems.get(
               newlySavedItem.id,
             );
-            if (enrichedItem != null) {
+            if (enrichedItem != null)
               FirestoreSyncService.queueItemForSync(enrichedItem);
-            }
           });
         } else {
-          // ☁️ If it's just plain text or code, sync immediately
           FirestoreSyncService.queueItemForSync(newlySavedItem);
         }
       }
@@ -223,9 +258,10 @@ class _CopyCopyAppState extends State<CopyCopyApp> with ClipboardListener {
         onHide: () => windowManager.hide(),
         currentThemeMode: _themeMode,
         onThemeChanged: _setTheme,
-        // --- NEW: Pass state to Dashboard ---
         currentTrayLimit: _trayLimit,
         onTrayLimitChanged: _updateTrayLimit,
+        onNuclearReset: _nuclearReset, // 🛠 Passed down!
+        onExportJson: _exportData, // 🛠 Passed down!
       ),
     );
   }

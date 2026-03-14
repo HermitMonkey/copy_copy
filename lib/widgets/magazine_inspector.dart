@@ -61,6 +61,27 @@ class MagazineInspector extends StatelessWidget {
                         _buildDetailedInfoBar(),
                         const SizedBox(height: 32),
 
+                        // 🛠 NEW: RENDER PDF ATTACHMENTS
+                        if (item.attachedPdfs != null &&
+                            item.attachedPdfs!.isNotEmpty) ...[
+                          Text(
+                            "ATTACHMENTS",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.5,
+                              color: isDark ? Colors.white38 : Colors.black38,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          ...item.attachedPdfs!.map(
+                            (pdf) => _buildPdfCard(pdf, isDark),
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+
+                        // 🛠 RESTORED: CONTEXTUAL IMAGE GALLERY
+
                         // 🛠 RESTORED: CONTEXTUAL IMAGE GALLERY
                         if (item.contextualImages != null &&
                             item.contextualImages!.isNotEmpty) ...[
@@ -119,7 +140,7 @@ class MagazineInspector extends StatelessWidget {
                                     ),
                                     const SizedBox(width: 8),
                                     const Text(
-                                      "TL;DR",
+                                      "Quick Summary",
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.deepPurpleAccent,
@@ -310,6 +331,83 @@ class MagazineInspector extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPdfCard(String pdfUrl, bool isDark) {
+    final uri = Uri.tryParse(pdfUrl);
+    final filename = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : "Document.pdf";
+    final domain = uri?.host ?? "External Source";
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF9F9FB),
+      child: InkWell(
+        onTap: () => _openInBrowser(pdfUrl),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: Colors.redAccent,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      Uri.decodeComponent(
+                        filename,
+                      ), // Clean up %20 in filenames
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      domain.toUpperCase(),
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : Colors.black54,
+                        fontSize: 10,
+                        letterSpacing: 1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Icon(
+                Icons.open_in_new_rounded,
+                color: isDark ? Colors.white30 : Colors.black38,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

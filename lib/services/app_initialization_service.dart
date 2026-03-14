@@ -7,6 +7,7 @@ import '../firebase_options.dart';
 import '../models/clipboard_item.dart';
 import 'encryption_service.dart';
 import 'firestore_sync_service.dart';
+import 'audio_service.dart'; // 🛠 Add this import
 
 /// Service to initialize all application components in order
 class AppInitializationService {
@@ -35,6 +36,7 @@ class AppInitializationService {
     );
     await EncryptionService.init();
     await FirestoreSyncService.authenticate();
+    await AudioService.init(); // 🛠 NEW: Spin up the audio engine in RAM
   }
 
   /// Initialize the local Isar database

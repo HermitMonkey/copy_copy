@@ -61,9 +61,17 @@ class ClipboardEnricher {
       String? heroImageUrl;
       String? summaryData;
       List<String> extractedImages = [];
+      List<String> extractedPdfs = []; // 🛠 NEW: Holds our found PDFs
 
+      // 🧠 1. THE DIRECT PDF FAST-PATH (Memory Safety)
+      // If the URL itself is a PDF, do NOT download it! Just flag it.
+      if (uri.path.toLowerCase().endsWith('.pdf')) {
+        extractedPdfs.add(url);
+        pageTitle = uri.pathSegments.last; // Use the filename as the title
+      }
       // --- THE YOUTUBE FAST-PATH ---
-      if (uri.host.contains('youtube.com') || uri.host.contains('youtu.be')) {
+      else if (uri.host.contains('youtube.com') ||
+          uri.host.contains('youtu.be')) {
         try {
           final oembedUrl = Uri.parse(
             'https://www.youtube.com/oembed?url=$url&format=json',
@@ -108,6 +116,24 @@ class ClipboardEnricher {
                     .querySelector('meta[name="twitter:image"]')
                     ?.attributes['content'];
 
+            // 🧠 2. PDF LINK SCANNER
+            // Search the HTML for anchor tags pointing to PDFs
+            document.querySelectorAll('a').forEach((a) {
+              final href = a.attributes['href'];
+              if (href != null &&
+                  href.toLowerCase().split('?').first.endsWith('.pdf')) {
+                String absolutePdf = href.startsWith('//')
+                    ? '${uri.scheme}:$href'
+                    : href.startsWith('/')
+                    ? '${uri.scheme}://${uri.host}$href'
+                    : href.startsWith('http')
+                    ? href
+                    : '${uri.scheme}://${uri.host}/$href';
+                extractedPdfs.add(absolutePdf);
+              }
+            });
+            extractedPdfs = extractedPdfs.toSet().toList(); // De-duplicate
+
             document
                 .querySelectorAll(
                   'script, style, nav, footer, header, aside, noscript, .ads, .comments',
@@ -121,7 +147,6 @@ class ClipboardEnricher {
                 document.body;
 
             if (articleNode != null) {
-              // 🧠 1. NON-AI INTELLIGENCE: Contextual Image Extraction
               articleNode.querySelectorAll('img').forEach((img) {
                 final src = img.attributes['src'] ?? img.attributes['data-src'];
                 if (src != null) {
@@ -143,15 +168,14 @@ class ClipboardEnricher {
                 }
               });
 
-              // Keep max unique contextual images
               extractedImages = extractedImages.toSet().toList();
-              if (extractedImages.length > _maxContextualImages)
+              if (extractedImages.length > _maxContextualImages) {
                 extractedImages = extractedImages.sublist(
                   0,
                   _maxContextualImages,
                 );
+              }
 
-              // 🧠 2. FORMATTING: Preserve Paragraph Breaks
               document
                   .querySelectorAll('p, br, h1, h2, h3, h4, h5, li, div')
                   .forEach((e) {
@@ -159,15 +183,22 @@ class ClipboardEnricher {
                   });
 
               String rawText = articleNode.text;
+              rawText = rawText.replaceAll(
+                RegExp(r'\bAdvertisement\b', caseSensitive: false),
+                '',
+              );
+              rawText = rawText.replaceAll(
+                RegExp(r'\bRead more:.*', caseSensitive: false),
+                '',
+              );
               rawText = rawText.replaceAll(RegExp(r'[ \t]+'), ' ');
               cleanArticleText = rawText
                   .replaceAll(RegExp(r'\n\s*\n+'), '\n\n')
                   .trim();
 
-              // 🧠 3. EXTRACTIVE SUMMARIZATION
-              if (cleanArticleText.length < _minArticleLength) {
+              if (cleanArticleText!.length < _minArticleLength) {
                 cleanArticleText = null;
-              } else if (cleanArticleText.length > _summarizeThreshold) {
+              } else if (cleanArticleText!.length > _summarizeThreshold) {
                 summaryData = await compute(_generateSummaryInIsolate, {
                   'text': cleanArticleText,
                   'title': pageTitle,
@@ -192,6 +223,8 @@ class ClipboardEnricher {
           if (extractedImages.isNotEmpty)
             latestItem.contextualImages = extractedImages;
           if (summaryData != null) latestItem.generatedSummary = summaryData;
+          if (extractedPdfs.isNotEmpty)
+            latestItem.attachedPdfs = extractedPdfs; // 🛠 NEW: Save PDFs
           await isar.clipboardItems.put(latestItem);
         }
       });

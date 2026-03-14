@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'models/clipboard_item.dart';
 import 'services/category_service.dart';
+import 'services/audio_service.dart';
 
 import 'widgets/sidebar_feed.dart';
 import 'widgets/global_dashboard.dart';
 import 'widgets/magazine_inspector.dart';
+import 'widgets/settings_modal.dart'; // 🛠 NEW IMPORT
 
 class PhoenixBoard extends StatefulWidget {
   final List<ClipboardItem> history;
@@ -15,6 +17,10 @@ class PhoenixBoard extends StatefulWidget {
   final int currentTrayLimit;
   final Function(int) onTrayLimitChanged;
 
+  // 🛠 NEW: Execution Callbacks
+  final VoidCallback onNuclearReset;
+  final Function(BuildContext) onExportJson;
+
   const PhoenixBoard({
     super.key,
     required this.history,
@@ -23,6 +29,8 @@ class PhoenixBoard extends StatefulWidget {
     required this.onThemeChanged,
     required this.currentTrayLimit,
     required this.onTrayLimitChanged,
+    required this.onNuclearReset,
+    required this.onExportJson,
   });
 
   @override
@@ -32,28 +40,30 @@ class PhoenixBoard extends StatefulWidget {
 class _PhoenixBoardState extends State<PhoenixBoard> {
   ClipboardItem? _selectedItem;
   bool _isPinned = false;
-
-  // 🛠 NEW: Routing and Search State
   String _searchQuery = '';
   String? _activeCategory;
 
-  void _selectItemAndInspect(ClipboardItem item) =>
-      setState(() => _selectedItem = item);
+  void _selectItemAndInspect(ClipboardItem item) {
+    AudioService.playClick(); // 🎵 Audio Polish
+    setState(() => _selectedItem = item);
+  }
 
-  void _backToDashboard() => setState(() {
-    _selectedItem = null;
-    _searchQuery = ''; // Clear search when returning
-  });
+  void _backToDashboard() {
+    AudioService.playClick(); // 🎵 Audio Polish
+    setState(() {
+      _selectedItem = null;
+      _searchQuery = '';
+    });
+  }
 
   void _togglePin() async {
+    AudioService.playClick(); // 🎵 Audio Polish
     setState(() => _isPinned = !_isPinned);
     await windowManager.setAlwaysOnTop(_isPinned);
   }
 
-  // 🧠 THE FILTERING ENGINE (Zero Latency)
   List<ClipboardItem> get _filteredHistory {
     return widget.history.where((item) {
-      // 1. Text Search Filter
       if (_searchQuery.isNotEmpty) {
         final query = _searchQuery.toLowerCase();
         final textMatches =
@@ -62,86 +72,26 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
             (item.articleText?.toLowerCase().contains(query) ?? false);
         if (!textMatches) return false;
       }
-
-      // 2. Category Filter (using CategoryService to avoid hardcoding)
       if (_activeCategory != null) {
-        if (!CategoryService.itemMatchesCategory(item, _activeCategory!)) {
+        if (!CategoryService.itemMatchesCategory(item, _activeCategory!))
           return false;
-        }
       }
-      return true; // Keep it if it passes all active filters
+      return true;
     }).toList();
   }
 
   void _showSettings(BuildContext context) {
-    // ... (Keep your exact existing Settings Modal code here)
+    AudioService.playClick();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24.0, 32.0, 24.0, 48.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Settings",
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const Divider(height: 32),
-            const Text(
-              "Appearance",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: SegmentedButton<ThemeMode>(
-                segments: const [
-                  ButtonSegment(
-                    value: ThemeMode.light,
-                    icon: Icon(Icons.light_mode),
-                    label: Text("Light"),
-                  ),
-                  ButtonSegment(
-                    value: ThemeMode.system,
-                    icon: Icon(Icons.settings_display),
-                    label: Text("System"),
-                  ),
-                  ButtonSegment(
-                    value: ThemeMode.dark,
-                    icon: Icon(Icons.dark_mode),
-                    label: Text("Dark"),
-                  ),
-                ],
-                selected: {widget.currentThemeMode},
-                onSelectionChanged: (Set<ThemeMode> newSelection) =>
-                    widget.onThemeChanged(newSelection.first),
-              ),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              "System Tray Menu",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: SegmentedButton<int>(
-                segments: const [
-                  ButtonSegment(value: 8, label: Text("8 Items")),
-                  ButtonSegment(value: 15, label: Text("15 Items")),
-                  ButtonSegment(value: 55, label: Text("55 Items")),
-                ],
-                selected: {
-                  {8, 15, 55}.contains(widget.currentTrayLimit)
-                      ? widget.currentTrayLimit
-                      : 15,
-                },
-                onSelectionChanged: (Set<int> newSelection) =>
-                    widget.onTrayLimitChanged(newSelection.first),
-              ),
-            ),
-          ],
-        ),
+      builder: (_) => SettingsModal(
+        currentThemeMode: widget.currentThemeMode,
+        onThemeChanged: widget.onThemeChanged,
+        currentTrayLimit: widget.currentTrayLimit,
+        onTrayLimitChanged: widget.onTrayLimitChanged,
+        onNuclearReset: widget.onNuclearReset,
+        onExportJson: () => widget.onExportJson(context),
       ),
     );
   }
@@ -149,8 +99,6 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
   @override
   Widget build(BuildContext context) {
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // We pass the filtered list down to the components
     final currentFeed = _filteredHistory;
 
     return Scaffold(
@@ -160,39 +108,40 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. THE SIDEBAR
           SidebarFeed(
             isDark: isDark,
-            history: currentFeed, // 🛠 Passes the filtered feed!
+            history: currentFeed,
             selectedItem: _selectedItem,
             isPinned: _isPinned,
             onTogglePin: _togglePin,
             onItemSelected: _selectItemAndInspect,
             onShowSettings: () => _showSettings(context),
-            onHide: () => windowManager.hide(),
-            // 🛠 SEARCH & FILTER PROPS
+            onHide: widget.onHide,
             searchQuery: _searchQuery,
             onSearchChanged: (val) => setState(() {
               _searchQuery = val;
-              _selectedItem = null; // Close inspector if they are searching
+              _selectedItem = null;
             }),
             activeCategory: _activeCategory,
-            onClearCategory: () => setState(() => _activeCategory = null),
+            onClearCategory: () {
+              AudioService.playClick();
+              setState(() => _activeCategory = null);
+            },
           ),
-
-          // 2. THE MAIN STAGE
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child: _selectedItem == null
                   ? GlobalDashboard(
-                      history: widget
-                          .history, // Dashboard analytics always reflect the FULL history
+                      history: widget.history,
                       isDark: isDark,
-                      onCategorySelected: (category) => setState(() {
-                        _activeCategory = category;
-                        _selectedItem = null;
-                      }),
+                      onCategorySelected: (category) {
+                        AudioService.playClick(); // 🎵 Audio Polish
+                        setState(() {
+                          _activeCategory = category;
+                          _selectedItem = null;
+                        });
+                      },
                     )
                   : MagazineInspector(
                       item: _selectedItem!,

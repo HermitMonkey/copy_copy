@@ -49,7 +49,7 @@ class SystemTrayManager {
     List<MenuItemBase> menuItems = [
       MenuItemLabel(
         // 🧠 DYNAMIC TEXT LOGIC: Updates based on current window state
-        label: isVisible ? 'Close Phoenix Dashboard' : 'Open Phoenix Dashboard',
+        label: isVisible ? 'Phoenix Dashboard' : 'Phoenix Dashboard',
         onClicked: (menuItem) async {
           await _toggleWindow();
           await updateMenu(items); // Refresh menu text after click

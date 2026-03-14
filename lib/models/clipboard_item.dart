@@ -20,7 +20,9 @@ class ClipboardItem {
 
   bool isSensitive = false;
 
-  // 🛠 NEW: Added these back after the reset!
   List<String>? contextualImages;
   String? generatedSummary;
+
+  // 🛠 NEW: Stores both direct PDF links and embedded PDF links
+  List<String>? attachedPdfs;
 }

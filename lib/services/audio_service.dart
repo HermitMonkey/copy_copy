@@ -1,23 +1,45 @@
-import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 class AudioService {
-  static final AudioPlayer _player = AudioPlayer();
+  // Separate players so one effect doesn't cut off the other.
+  static final AudioPlayer _clickPlayer = AudioPlayer();
+  static final AudioPlayer _thwackPlayer = AudioPlayer();
+  static bool _initialized = false;
+
+  static Future<void> init() async {
+    if (_initialized) return;
+
+    try {
+      await _clickPlayer.setReleaseMode(ReleaseMode.stop);
+      await _clickPlayer.setVolume(1.0);
+
+      await _thwackPlayer.setReleaseMode(ReleaseMode.stop);
+      await _thwackPlayer.setVolume(1.0);
+
+      _initialized = true;
+      print('🎵 Audio Service initialized.');
+    } catch (e) {
+      print('⚠️ Audio Service init failed: $e');
+    }
+  }
 
   static Future<void> playClick() async {
-    // Native macOS click sound (Zero-latency, no assets required)
-    await SystemSound.play(SystemSoundType.click);
+    if (!_initialized) await init();
+
+    try {
+      await _clickPlayer.play(AssetSource('sounds/click.mp3'));
+    } catch (e) {
+      print('⚠️ Failed to play click sound: $e');
+    }
   }
 
   static Future<void> playThwack() async {
-    // Native macOS alert sound for deletions/major actions
-    await SystemSound.play(SystemSoundType.alert);
+    if (!_initialized) await init();
 
-    // NOTE: For true Sutherland Polish, uncomment below once you add 'thwack.mp3' to your assets folder
-    // await _player.play(AssetSource('sounds/thwack.mp3'));
-  }
-
-  static Future<void> playSuccess() async {
-    // await _player.play(AssetSource('sounds/success.mp3'));
+    try {
+      await _thwackPlayer.play(AssetSource('sounds/thwack.mp3'));
+    } catch (e) {
+      print('⚠️ Failed to play thwack sound: $e');
+    }
   }
 }

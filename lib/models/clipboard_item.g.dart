@@ -22,48 +22,53 @@ const ClipboardItemSchema = CollectionSchema(
       name: r'articleText',
       type: IsarType.string,
     ),
-    r'content': PropertySchema(
+    r'attachedPdfs': PropertySchema(
       id: 1,
+      name: r'attachedPdfs',
+      type: IsarType.stringList,
+    ),
+    r'content': PropertySchema(
+      id: 2,
       name: r'content',
       type: IsarType.string,
     ),
     r'contentType': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'contentType',
       type: IsarType.string,
     ),
     r'contextualImages': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'contextualImages',
       type: IsarType.stringList,
     ),
     r'faviconUrl': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'faviconUrl',
       type: IsarType.string,
     ),
     r'generatedSummary': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'generatedSummary',
       type: IsarType.string,
     ),
     r'heroImageUrl': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'heroImageUrl',
       type: IsarType.string,
     ),
     r'isSensitive': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'isSensitive',
       type: IsarType.bool,
     ),
     r'timestamp': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'timestamp',
       type: IsarType.dateTime,
     ),
     r'title': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'title',
       type: IsarType.string,
     )
@@ -121,6 +126,18 @@ int _clipboardItemEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  {
+    final list = object.attachedPdfs;
+    if (list != null) {
+      bytesCount += 3 + list.length * 3;
+      {
+        for (var i = 0; i < list.length; i++) {
+          final value = list[i];
+          bytesCount += value.length * 3;
+        }
+      }
+    }
+  }
   bytesCount += 3 + object.content.length * 3;
   {
     final value = object.contentType;
@@ -174,15 +191,16 @@ void _clipboardItemSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.articleText);
-  writer.writeString(offsets[1], object.content);
-  writer.writeString(offsets[2], object.contentType);
-  writer.writeStringList(offsets[3], object.contextualImages);
-  writer.writeString(offsets[4], object.faviconUrl);
-  writer.writeString(offsets[5], object.generatedSummary);
-  writer.writeString(offsets[6], object.heroImageUrl);
-  writer.writeBool(offsets[7], object.isSensitive);
-  writer.writeDateTime(offsets[8], object.timestamp);
-  writer.writeString(offsets[9], object.title);
+  writer.writeStringList(offsets[1], object.attachedPdfs);
+  writer.writeString(offsets[2], object.content);
+  writer.writeString(offsets[3], object.contentType);
+  writer.writeStringList(offsets[4], object.contextualImages);
+  writer.writeString(offsets[5], object.faviconUrl);
+  writer.writeString(offsets[6], object.generatedSummary);
+  writer.writeString(offsets[7], object.heroImageUrl);
+  writer.writeBool(offsets[8], object.isSensitive);
+  writer.writeDateTime(offsets[9], object.timestamp);
+  writer.writeString(offsets[10], object.title);
 }
 
 ClipboardItem _clipboardItemDeserialize(
@@ -193,16 +211,17 @@ ClipboardItem _clipboardItemDeserialize(
 ) {
   final object = ClipboardItem();
   object.articleText = reader.readStringOrNull(offsets[0]);
-  object.content = reader.readString(offsets[1]);
-  object.contentType = reader.readStringOrNull(offsets[2]);
-  object.contextualImages = reader.readStringList(offsets[3]);
-  object.faviconUrl = reader.readStringOrNull(offsets[4]);
-  object.generatedSummary = reader.readStringOrNull(offsets[5]);
-  object.heroImageUrl = reader.readStringOrNull(offsets[6]);
+  object.attachedPdfs = reader.readStringList(offsets[1]);
+  object.content = reader.readString(offsets[2]);
+  object.contentType = reader.readStringOrNull(offsets[3]);
+  object.contextualImages = reader.readStringList(offsets[4]);
+  object.faviconUrl = reader.readStringOrNull(offsets[5]);
+  object.generatedSummary = reader.readStringOrNull(offsets[6]);
+  object.heroImageUrl = reader.readStringOrNull(offsets[7]);
   object.id = id;
-  object.isSensitive = reader.readBool(offsets[7]);
-  object.timestamp = reader.readDateTime(offsets[8]);
-  object.title = reader.readStringOrNull(offsets[9]);
+  object.isSensitive = reader.readBool(offsets[8]);
+  object.timestamp = reader.readDateTime(offsets[9]);
+  object.title = reader.readStringOrNull(offsets[10]);
   return object;
 }
 
@@ -216,22 +235,24 @@ P _clipboardItemDeserializeProp<P>(
     case 0:
       return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readString(offset)) as P;
-    case 2:
-      return (reader.readStringOrNull(offset)) as P;
-    case 3:
       return (reader.readStringList(offset)) as P;
-    case 4:
+    case 2:
+      return (reader.readString(offset)) as P;
+    case 3:
       return (reader.readStringOrNull(offset)) as P;
+    case 4:
+      return (reader.readStringList(offset)) as P;
     case 5:
       return (reader.readStringOrNull(offset)) as P;
     case 6:
       return (reader.readStringOrNull(offset)) as P;
     case 7:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 8:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 9:
+      return (reader.readDateTime(offset)) as P;
+    case 10:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -631,6 +652,249 @@ extension ClipboardItemQueryFilter
         property: r'articleText',
         value: '',
       ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'attachedPdfs',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'attachedPdfs',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'attachedPdfs',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'attachedPdfs',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'attachedPdfs',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'attachedPdfs',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'attachedPdfs',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'attachedPdfs',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'attachedPdfs',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'attachedPdfs',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'attachedPdfs',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'attachedPdfs',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'attachedPdfs',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'attachedPdfs',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'attachedPdfs',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'attachedPdfs',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'attachedPdfs',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      attachedPdfsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'attachedPdfs',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
     });
   }
 
@@ -2173,6 +2437,13 @@ extension ClipboardItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QDistinct>
+      distinctByAttachedPdfs() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'attachedPdfs');
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QDistinct> distinctByContent(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -2248,6 +2519,13 @@ extension ClipboardItemQueryProperty
   QueryBuilder<ClipboardItem, String?, QQueryOperations> articleTextProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'articleText');
+    });
+  }
+
+  QueryBuilder<ClipboardItem, List<String>?, QQueryOperations>
+      attachedPdfsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'attachedPdfs');
     });
   }
 
