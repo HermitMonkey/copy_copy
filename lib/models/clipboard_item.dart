@@ -17,11 +17,10 @@ class ClipboardItem {
   String? articleText;
   String? contentType;
   String? heroImageUrl;
-  List<String>? contextualImages;
 
   bool isSensitive = false;
 
-  // 🛠 NEW: Tracks if this item has been shared externally
-  @Index()
-  bool isShared = false;
+  // 🛠 NEW: Added these back after the reset!
+  List<String>? contextualImages;
+  String? generatedSummary;
 }

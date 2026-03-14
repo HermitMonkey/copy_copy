@@ -60,8 +60,91 @@ class MagazineInspector extends StatelessWidget {
                         const SizedBox(height: 24),
                         _buildDetailedInfoBar(),
                         const SizedBox(height: 32),
+
+                        // 🛠 RESTORED: CONTEXTUAL IMAGE GALLERY
+                        if (item.contextualImages != null &&
+                            item.contextualImages!.isNotEmpty) ...[
+                          SizedBox(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: item.contextualImages!.length,
+                              itemBuilder: (context, index) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 16),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Image.network(
+                                      item.contextualImages![index],
+                                      height: 200,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          const SizedBox.shrink(),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                        ],
+
                         const Divider(thickness: 0.5),
                         const SizedBox(height: 40),
+
+                        // 🛠 RESTORED: THE TL;DR BOX
+                        if (item.generatedSummary != null &&
+                            item.generatedSummary!.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(24),
+                            margin: const EdgeInsets.only(bottom: 40),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.deepPurpleAccent.withOpacity(0.1)
+                                  : Colors.deepPurple.shade50,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.deepPurpleAccent.withOpacity(0.3),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.auto_awesome,
+                                      color: Colors.deepPurpleAccent,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      "TL;DR",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.deepPurpleAccent,
+                                        fontSize: 14,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  item.generatedSummary!,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    height: 1.6,
+                                    color: isDark
+                                        ? Colors.white.withOpacity(0.85)
+                                        : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                        // Main Article Body
                         Text(
                           item.articleText ?? item.content,
                           style: TextStyle(

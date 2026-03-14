@@ -12,8 +12,7 @@ class SystemTrayManager {
     required List<String> history,
   }) async {
     await _systemTray.initSystemTray(
-      title:
-          "copy_copy", // 🛠 FIX 1: Removed emoji to fix macOS hit-box/rendering bugs
+      title: "⌘ copy_copy", // 🛠 FIX: Uses the native Mac command symbol!
       iconPath: '',
     );
 

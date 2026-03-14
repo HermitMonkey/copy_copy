@@ -42,19 +42,19 @@ const ClipboardItemSchema = CollectionSchema(
       name: r'faviconUrl',
       type: IsarType.string,
     ),
-    r'heroImageUrl': PropertySchema(
+    r'generatedSummary': PropertySchema(
       id: 5,
+      name: r'generatedSummary',
+      type: IsarType.string,
+    ),
+    r'heroImageUrl': PropertySchema(
+      id: 6,
       name: r'heroImageUrl',
       type: IsarType.string,
     ),
     r'isSensitive': PropertySchema(
-      id: 6,
-      name: r'isSensitive',
-      type: IsarType.bool,
-    ),
-    r'isShared': PropertySchema(
       id: 7,
-      name: r'isShared',
+      name: r'isSensitive',
       type: IsarType.bool,
     ),
     r'timestamp': PropertySchema(
@@ -95,19 +95,6 @@ const ClipboardItemSchema = CollectionSchema(
       properties: [
         IndexPropertySchema(
           name: r'timestamp',
-          type: IndexType.value,
-          caseSensitive: false,
-        )
-      ],
-    ),
-    r'isShared': IndexSchema(
-      id: 325927935090462033,
-      name: r'isShared',
-      unique: false,
-      replace: false,
-      properties: [
-        IndexPropertySchema(
-          name: r'isShared',
           type: IndexType.value,
           caseSensitive: false,
         )
@@ -160,6 +147,12 @@ int _clipboardItemEstimateSize(
     }
   }
   {
+    final value = object.generatedSummary;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.heroImageUrl;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -185,9 +178,9 @@ void _clipboardItemSerialize(
   writer.writeString(offsets[2], object.contentType);
   writer.writeStringList(offsets[3], object.contextualImages);
   writer.writeString(offsets[4], object.faviconUrl);
-  writer.writeString(offsets[5], object.heroImageUrl);
-  writer.writeBool(offsets[6], object.isSensitive);
-  writer.writeBool(offsets[7], object.isShared);
+  writer.writeString(offsets[5], object.generatedSummary);
+  writer.writeString(offsets[6], object.heroImageUrl);
+  writer.writeBool(offsets[7], object.isSensitive);
   writer.writeDateTime(offsets[8], object.timestamp);
   writer.writeString(offsets[9], object.title);
 }
@@ -204,10 +197,10 @@ ClipboardItem _clipboardItemDeserialize(
   object.contentType = reader.readStringOrNull(offsets[2]);
   object.contextualImages = reader.readStringList(offsets[3]);
   object.faviconUrl = reader.readStringOrNull(offsets[4]);
-  object.heroImageUrl = reader.readStringOrNull(offsets[5]);
+  object.generatedSummary = reader.readStringOrNull(offsets[5]);
+  object.heroImageUrl = reader.readStringOrNull(offsets[6]);
   object.id = id;
-  object.isSensitive = reader.readBool(offsets[6]);
-  object.isShared = reader.readBool(offsets[7]);
+  object.isSensitive = reader.readBool(offsets[7]);
   object.timestamp = reader.readDateTime(offsets[8]);
   object.title = reader.readStringOrNull(offsets[9]);
   return object;
@@ -233,7 +226,7 @@ P _clipboardItemDeserializeProp<P>(
     case 5:
       return (reader.readStringOrNull(offset)) as P;
     case 6:
-      return (reader.readBool(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
       return (reader.readBool(offset)) as P;
     case 8:
@@ -270,14 +263,6 @@ extension ClipboardItemQueryWhereSort
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         const IndexWhereClause.any(indexName: r'timestamp'),
-      );
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhere> anyIsShared() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(
-        const IndexWhereClause.any(indexName: r'isShared'),
       );
     });
   }
@@ -489,51 +474,6 @@ extension ClipboardItemQueryWhere
         upper: [upperTimestamp],
         includeUpper: includeUpper,
       ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause> isSharedEqualTo(
-      bool isShared) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addWhereClause(IndexWhereClause.equalTo(
-        indexName: r'isShared',
-        value: [isShared],
-      ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterWhereClause>
-      isSharedNotEqualTo(bool isShared) {
-    return QueryBuilder.apply(this, (query) {
-      if (query.whereSort == Sort.asc) {
-        return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'isShared',
-              lower: [],
-              upper: [isShared],
-              includeUpper: false,
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'isShared',
-              lower: [isShared],
-              includeLower: false,
-              upper: [],
-            ));
-      } else {
-        return query
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'isShared',
-              lower: [isShared],
-              includeLower: false,
-              upper: [],
-            ))
-            .addWhereClause(IndexWhereClause.between(
-              indexName: r'isShared',
-              lower: [],
-              upper: [isShared],
-              includeUpper: false,
-            ));
-      }
     });
   }
 }
@@ -1384,6 +1324,160 @@ extension ClipboardItemQueryFilter
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'generatedSummary',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'generatedSummary',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'generatedSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'generatedSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'generatedSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'generatedSummary',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'generatedSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'generatedSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'generatedSummary',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'generatedSummary',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'generatedSummary',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
+      generatedSummaryIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'generatedSummary',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
       heroImageUrlIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1596,16 +1690,6 @@ extension ClipboardItemQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'isSensitive',
-        value: value,
-      ));
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterFilterCondition>
-      isSharedEqualTo(bool value) {
-    return QueryBuilder.apply(this, (query) {
-      return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'isShared',
         value: value,
       ));
     });
@@ -1882,6 +1966,20 @@ extension ClipboardItemQuerySortBy
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      sortByGeneratedSummary() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatedSummary', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      sortByGeneratedSummaryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatedSummary', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
       sortByHeroImageUrl() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'heroImageUrl', Sort.asc);
@@ -1905,19 +2003,6 @@ extension ClipboardItemQuerySortBy
       sortByIsSensitiveDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isSensitive', Sort.desc);
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> sortByIsShared() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'isShared', Sort.asc);
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
-      sortByIsSharedDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'isShared', Sort.desc);
     });
   }
 
@@ -2001,6 +2086,20 @@ extension ClipboardItemQuerySortThenBy
   }
 
   QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      thenByGeneratedSummary() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatedSummary', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
+      thenByGeneratedSummaryDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'generatedSummary', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
       thenByHeroImageUrl() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'heroImageUrl', Sort.asc);
@@ -2036,19 +2135,6 @@ extension ClipboardItemQuerySortThenBy
       thenByIsSensitiveDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'isSensitive', Sort.desc);
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy> thenByIsShared() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'isShared', Sort.asc);
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QAfterSortBy>
-      thenByIsSharedDesc() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'isShared', Sort.desc);
     });
   }
 
@@ -2115,6 +2201,14 @@ extension ClipboardItemQueryWhereDistinct
     });
   }
 
+  QueryBuilder<ClipboardItem, ClipboardItem, QDistinct>
+      distinctByGeneratedSummary({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'generatedSummary',
+          caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<ClipboardItem, ClipboardItem, QDistinct> distinctByHeroImageUrl(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -2126,12 +2220,6 @@ extension ClipboardItemQueryWhereDistinct
       distinctByIsSensitive() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'isSensitive');
-    });
-  }
-
-  QueryBuilder<ClipboardItem, ClipboardItem, QDistinct> distinctByIsShared() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'isShared');
     });
   }
 
@@ -2189,6 +2277,13 @@ extension ClipboardItemQueryProperty
   }
 
   QueryBuilder<ClipboardItem, String?, QQueryOperations>
+      generatedSummaryProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'generatedSummary');
+    });
+  }
+
+  QueryBuilder<ClipboardItem, String?, QQueryOperations>
       heroImageUrlProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'heroImageUrl');
@@ -2198,12 +2293,6 @@ extension ClipboardItemQueryProperty
   QueryBuilder<ClipboardItem, bool, QQueryOperations> isSensitiveProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'isSensitive');
-    });
-  }
-
-  QueryBuilder<ClipboardItem, bool, QQueryOperations> isSharedProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'isShared');
     });
   }
 
