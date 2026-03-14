@@ -61,16 +61,13 @@ class ClipboardEnricher {
       String? heroImageUrl;
       String? summaryData;
       List<String> extractedImages = [];
-      List<String> extractedPdfs = []; // 🛠 NEW: Holds our found PDFs
+      List<String> extractedPdfs = [];
 
-      // 🧠 1. THE DIRECT PDF FAST-PATH (Memory Safety)
-      // If the URL itself is a PDF, do NOT download it! Just flag it.
+      // 🧠 1. THE DIRECT PDF FAST-PATH
       if (uri.path.toLowerCase().endsWith('.pdf')) {
         extractedPdfs.add(url);
-        pageTitle = uri.pathSegments.last; // Use the filename as the title
-      }
-      // --- THE YOUTUBE FAST-PATH ---
-      else if (uri.host.contains('youtube.com') ||
+        pageTitle = uri.pathSegments.last;
+      } else if (uri.host.contains('youtube.com') ||
           uri.host.contains('youtu.be')) {
         try {
           final oembedUrl = Uri.parse(
@@ -85,9 +82,7 @@ class ClipboardEnricher {
         } catch (e) {
           debugPrint("YouTube enrichment failed: $e");
         }
-      }
-      // --- GENERAL WEB SCRAPING ---
-      else {
+      } else {
         try {
           final response = await http
               .get(
@@ -116,8 +111,6 @@ class ClipboardEnricher {
                     .querySelector('meta[name="twitter:image"]')
                     ?.attributes['content'];
 
-            // 🧠 2. PDF LINK SCANNER
-            // Search the HTML for anchor tags pointing to PDFs
             document.querySelectorAll('a').forEach((a) {
               final href = a.attributes['href'];
               if (href != null &&
@@ -132,12 +125,40 @@ class ClipboardEnricher {
                 extractedPdfs.add(absolutePdf);
               }
             });
-            extractedPdfs = extractedPdfs.toSet().toList(); // De-duplicate
+            extractedPdfs = extractedPdfs.toSet().toList();
 
+            // 🧠 2. SURGICAL SCRAPING (The Britannica Fix)
+            // Destroy absolutely everything that isn't core content
+            final selectorsToNuke = [
+              'nav',
+              'footer',
+              'header',
+              'aside',
+              'script',
+              'style',
+              'noscript',
+              'iframe',
+              'form',
+              'button',
+              '.ad',
+              '.ads',
+              '.advertisement',
+              '.social-share',
+              '.newsletter',
+              '.cookie-banner',
+              '.menu',
+              '.sidebar',
+              '.comments',
+              '.related-posts',
+              '.author-bio',
+              '[role="navigation"]',
+              '[role="banner"]',
+              '[role="complementary"]',
+              '[id*="menu"]',
+              '[class*="menu"]',
+            ];
             document
-                .querySelectorAll(
-                  'script, style, nav, footer, header, aside, noscript, .ads, .comments',
-                )
+                .querySelectorAll(selectorsToNuke.join(', '))
                 .forEach((e) => e.remove());
 
             var articleNode =
@@ -176,11 +197,17 @@ class ClipboardEnricher {
                 );
               }
 
-              document
-                  .querySelectorAll('p, br, h1, h2, h3, h4, h5, li, div')
-                  .forEach((e) {
-                    e.append(html_parser.parseFragment('\n\n'));
-                  });
+              // 🧠 3. THE BEAUTIFYING AGENT
+              // Force headings to uppercase and add bullets to lists before extracting text
+              articleNode.querySelectorAll('h1, h2, h3, h4').forEach((h) {
+                h.text = '\n\n${h.text.trim().toUpperCase()}\n\n';
+              });
+              articleNode.querySelectorAll('li').forEach((li) {
+                li.text = '\n• ${li.text.trim()}';
+              });
+              articleNode.querySelectorAll('p, div, section').forEach((p) {
+                p.append(html_parser.parseFragment('\n\n'));
+              });
 
               String rawText = articleNode.text;
               rawText = rawText.replaceAll(
@@ -192,6 +219,7 @@ class ClipboardEnricher {
                 '',
               );
               rawText = rawText.replaceAll(RegExp(r'[ \t]+'), ' ');
+
               cleanArticleText = rawText
                   .replaceAll(RegExp(r'\n\s*\n+'), '\n\n')
                   .trim();
@@ -211,7 +239,6 @@ class ClipboardEnricher {
         }
       }
 
-      // Save findings back to Isar
       await isar.writeTxn(() async {
         final latestItem = await isar.clipboardItems.get(itemId);
         if (latestItem != null) {
@@ -223,8 +250,7 @@ class ClipboardEnricher {
           if (extractedImages.isNotEmpty)
             latestItem.contextualImages = extractedImages;
           if (summaryData != null) latestItem.generatedSummary = summaryData;
-          if (extractedPdfs.isNotEmpty)
-            latestItem.attachedPdfs = extractedPdfs; // 🛠 NEW: Save PDFs
+          if (extractedPdfs.isNotEmpty) latestItem.attachedPdfs = extractedPdfs;
           await isar.clipboardItems.put(latestItem);
         }
       });

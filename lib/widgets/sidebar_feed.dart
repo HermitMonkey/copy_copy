@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/clipboard_item.dart';
+import '../services/audio_service.dart'; // 🛠 Added audio service import!
 
 class SidebarFeed extends StatelessWidget {
   final bool isDark;
@@ -11,11 +12,14 @@ class SidebarFeed extends StatelessWidget {
   final VoidCallback onShowSettings;
   final VoidCallback onHide;
 
-  // 🛠 NEW: Search and Routing State
+  // Search and Routing State
   final String searchQuery;
   final ValueChanged<String> onSearchChanged;
   final String? activeCategory;
   final VoidCallback onClearCategory;
+
+  // 🛠 NEW: Delete callback
+  final Function(int) onDeleteItem;
 
   const SidebarFeed({
     super.key,
@@ -31,6 +35,7 @@ class SidebarFeed extends StatelessWidget {
     required this.onSearchChanged,
     required this.activeCategory,
     required this.onClearCategory,
+    required this.onDeleteItem, // 🛠 Added to constructor!
   });
 
   @override
@@ -64,7 +69,7 @@ class SidebarFeed extends StatelessWidget {
             ),
           ),
 
-          // 🛠 NEW: SEARCH BAR
+          // SEARCH BAR
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: TextField(
@@ -93,23 +98,20 @@ class SidebarFeed extends StatelessWidget {
             ),
           ),
 
-          // 🛠 NEW: ACTIVE FOLDER CHIP
-          // 🛠 FIX: ACTIVE FOLDER CHIP (No more police lines!)
+          // ACTIVE FOLDER CHIP
           if (activeCategory != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: InputChip(
                 label: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: 160,
-                  ), // Leaves room for the 'x'
+                  constraints: const BoxConstraints(maxWidth: 160),
                   child: Text(
                     activeCategory!,
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
-                    overflow: TextOverflow.ellipsis, // Truncates long names
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 deleteIcon: const Icon(Icons.close, size: 14),
@@ -143,51 +145,74 @@ class SidebarFeed extends StatelessWidget {
               itemBuilder: (context, index) {
                 final item = history[index];
                 final bool isSelected = selectedItem?.id == item.id;
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 4),
-                  child: ListTile(
-                    dense: true,
-                    selected: isSelected,
-                    selectedTileColor: isDark
-                        ? Colors.white.withOpacity(0.05)
-                        : Colors.black.withOpacity(0.05),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    leading: item.faviconUrl != null
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Image.network(
-                              item.faviconUrl!,
-                              width: 18,
-                              height: 18,
-                              errorBuilder: (_, __, ___) =>
-                                  const Icon(Icons.link, size: 18),
-                            ),
-                          )
-                        : Icon(
-                            item.contentType == 'url'
-                                ? Icons.link
-                                : Icons.notes,
-                            size: 18,
-                            color: Colors.deepPurpleAccent,
-                          ),
-                    title: Text(
-                      item.title ?? "Copied Content",
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                  // 🛠 FIX: Wrapped the ListTile in the Dismissible widget!
+                  child: Dismissible(
+                    key: ValueKey(item.id),
+                    direction:
+                        DismissDirection.endToStart, // Swipe right to left
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 24),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.white,
                       ),
                     ),
-                    subtitle: Text(
-                      item.timestamp.toString().substring(11, 16),
-                      style: const TextStyle(fontSize: 10),
+                    onDismissed: (_) {
+                      AudioService.playThwack();
+                      onDeleteItem(item.id);
+                    },
+                    child: ListTile(
+                      dense: true,
+                      selected: isSelected,
+                      selectedTileColor: isDark
+                          ? Colors.white.withOpacity(0.05)
+                          : Colors.black.withOpacity(0.05),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      leading: item.faviconUrl != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.network(
+                                item.faviconUrl!,
+                                width: 18,
+                                height: 18,
+                                errorBuilder: (_, __, ___) =>
+                                    const Icon(Icons.link, size: 18),
+                              ),
+                            )
+                          : Icon(
+                              item.contentType == 'url'
+                                  ? Icons.link
+                                  : Icons.notes,
+                              size: 18,
+                              color: Colors.deepPurpleAccent,
+                            ),
+                      title: Text(
+                        item.title ?? "Copied Content",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(
+                        item.timestamp.toString().substring(11, 16),
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                      onTap: () => onItemSelected(item),
                     ),
-                    onTap: () => onItemSelected(item),
                   ),
                 );
               },

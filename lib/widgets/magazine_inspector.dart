@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/clipboard_item.dart';
+import '../services/audio_service.dart';
 
 class MagazineInspector extends StatelessWidget {
   final ClipboardItem item;
   final bool isDark;
   final VoidCallback onBack;
+  final VoidCallback onDelete; // 🛠 Added for single-item deletion
 
   const MagazineInspector({
     super.key,
     required this.item,
     required this.isDark,
     required this.onBack,
+    required this.onDelete, // 🛠 Required in constructor
   });
 
   Future<void> _openInBrowser(String url) async {
@@ -94,6 +97,66 @@ class MagazineInspector extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildBeautifiedArticle(String text, bool isDark) {
+    // Split the text into individual paragraphs
+    final paragraphs = text
+        .split(RegExp(r'\n\s*\n+'))
+        .where((p) => p.trim().isNotEmpty)
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: paragraphs.map((p) {
+        // Detect if the paragraph is a heading or a bullet point
+        final isHeading =
+            p == p.toUpperCase() && p.length < 100 && !p.startsWith('•');
+        final isBullet = p.startsWith('•');
+
+        if (isHeading) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 32, bottom: 16),
+            child: Text(
+              p,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.5,
+                color: isDark ? Colors.white : Colors.black,
+                fontFamily: 'Georgia',
+              ),
+            ),
+          );
+        } else if (isBullet) {
+          return Padding(
+            padding: const EdgeInsets.only(left: 16, bottom: 8),
+            child: Text(
+              p,
+              style: TextStyle(
+                fontSize: 18,
+                height: 1.6,
+                fontFamily: 'Georgia',
+                color: isDark ? Colors.white.withOpacity(0.85) : Colors.black87,
+              ),
+            ),
+          );
+        } else {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Text(
+              p,
+              style: TextStyle(
+                fontSize: 19,
+                height: 1.8,
+                fontFamily: 'Georgia',
+                color: isDark ? Colors.white.withOpacity(0.85) : Colors.black87,
+              ),
+            ),
+          );
+        }
+      }).toList(),
     );
   }
 
@@ -186,7 +249,7 @@ class MagazineInspector extends StatelessWidget {
                         const Divider(thickness: 0.5),
                         const SizedBox(height: 40),
 
-                        // THE TL;DR BOX
+                        // THE SUMMARY BOX
                         if (item.generatedSummary != null &&
                             item.generatedSummary!.isNotEmpty)
                           Container(
@@ -238,23 +301,15 @@ class MagazineInspector extends StatelessWidget {
                             ),
                           ),
 
-                        // 🛠 MOVED: RAW SOURCE IMMEDIATELY BELOW SUMMARY
+                        // RAW SOURCE
                         _buildSourceFooter(),
                         const SizedBox(height: 40),
 
-                        // Main Article Body
-                        Text(
-                          item.articleText ??
-                              "", // Only show if we actually enriched something
-                          style: TextStyle(
-                            fontSize: 19,
-                            height: 1.75,
-                            fontFamily: 'Georgia',
-                            color: isDark
-                                ? Colors.white.withOpacity(0.85)
-                                : Colors.black87,
-                          ),
-                        ),
+                        // BEAUTIFIED MAIN ARTICLE BODY
+                        if (item.articleText != null &&
+                            item.articleText!.isNotEmpty)
+                          _buildBeautifiedArticle(item.articleText!, isDark),
+
                         const SizedBox(height: 80),
                       ],
                     ),
@@ -301,6 +356,22 @@ class MagazineInspector extends StatelessWidget {
             tooltip: "Back to Workspace",
           ),
           const Spacer(),
+
+          // 🛠 THE NEW TRASH BUTTON
+          IconButton(
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              size: 18,
+              color: Colors.redAccent,
+            ),
+            tooltip: "Delete permanently",
+            onPressed: () {
+              AudioService.playThwack();
+              onDelete();
+            },
+          ),
+          const SizedBox(width: 8),
+
           _buildSlimButton(
             Icons.copy_rounded,
             "Copy",

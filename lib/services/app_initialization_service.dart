@@ -12,8 +12,20 @@ import '../models/clipboard_item.dart';
 import 'encryption_service.dart';
 import 'firestore_sync_service.dart';
 import 'audio_service.dart';
+import '../models/smart_folder.dart'; // 🛠 NEW
 
 class AppInitializationService {
+  static Future<Isar> initializeIsarDatabase() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return await Isar.open(
+      [
+        ClipboardItemSchema,
+        SmartFolderSchema,
+      ], // 🛠 FIX: Added SmartFolderSchema
+      directory: dir.path,
+    );
+  }
+
   static Future<void> initializeWindowManager() async {
     await windowManager.ensureInitialized();
 
@@ -38,11 +50,6 @@ class AppInitializationService {
     await EncryptionService.init();
     await FirestoreSyncService.authenticate();
     await AudioService.init();
-  }
-
-  static Future<Isar> initializeIsarDatabase() async {
-    final dir = await getApplicationDocumentsDirectory();
-    return await Isar.open([ClipboardItemSchema], directory: dir.path);
   }
 
   // 🛠 NEW: Registers the app location for macOS Launch at Login

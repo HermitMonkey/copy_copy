@@ -1,237 +1,219 @@
 import 'package:flutter/material.dart';
 import '../models/clipboard_item.dart';
-import '../services/category_service.dart';
-import '../services/clipboard_filter_service.dart';
+import '../models/smart_folder.dart';
+import '../services/audio_service.dart';
+import 'smart_folder_modal.dart';
 
 class GlobalDashboard extends StatelessWidget {
   final List<ClipboardItem> history;
+  final List<SmartFolder> smartFolders; // 🛠 NEW
   final bool isDark;
   final Function(String) onCategorySelected;
+  final Function(SmartFolder) onCreateFolder; // 🛠 NEW
+  final Function(int) onDeleteFolder; // 🛠 NEW
 
   const GlobalDashboard({
     super.key,
     required this.history,
+    required this.smartFolders,
     required this.isDark,
     required this.onCategorySelected,
+    required this.onCreateFolder,
+    required this.onDeleteFolder,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Use the filter service to compute all statistics at once
-    final stats = ClipboardFilterService.computeStats(history);
-
-    return SingleChildScrollView(
-      key: const ValueKey("dashboard"),
-      padding: const EdgeInsets.all(48),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            "Workspace",
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 40),
-          _buildGitHubStyleActivityCard(stats),
-          const SizedBox(height: 48),
-          Text(
-            "COLLECTIONS",
-            style: TextStyle(
-              letterSpacing: 1.5,
-              fontWeight: FontWeight.bold,
-              color: isDark ? Colors.white38 : Colors.black38,
-              fontSize: 11,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(48),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Workspace",
+              style: TextStyle(
+                fontSize: 48,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          GridView.count(
-            crossAxisCount: MediaQuery.of(context).size.width > 1000 ? 3 : 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 20,
-            mainAxisSpacing: 20,
-            childAspectRatio: 1.4,
-            // Build folder cards from category definitions instead of hardcoding
-            children: CategoryService.allCategories
-                .map(
-                  (category) => _buildFolderCard(
-                    category: category,
-                    itemCount: CategoryService.countItemsInCategory(
-                      history,
-                      category.id,
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGitHubStyleActivityCard(ContentStats stats) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text(
-                "Clipboard Composition",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-              const Spacer(),
-              Text(
-                "${stats.total} Total Clips",
-                style: TextStyle(
-                  color: isDark ? Colors.white54 : Colors.black54,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Row(
-              children: [
-                if (stats.linksCount > 0)
-                  Expanded(
-                    flex: stats.linksCount,
-                    child: Container(
-                      height: 12,
-                      color: Colors.deepPurpleAccent,
-                    ),
-                  ),
-                if (stats.codeCount > 0)
-                  Expanded(
-                    flex: stats.codeCount,
-                    child: Container(height: 12, color: Colors.green),
-                  ),
-                if (stats.textCount > 0)
-                  Expanded(
-                    flex: stats.textCount,
-                    child: Container(height: 12, color: Colors.orange),
-                  ),
-                if (stats.total == 0)
-                  Expanded(
-                    child: Container(
-                      height: 12,
-                      color: isDark ? Colors.white10 : Colors.black12,
-                    ),
-                  ),
-              ],
+            const SizedBox(height: 8),
+            Text(
+              "You have ${history.length} items securely vaulted in your local database.",
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),
-          ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 32,
-            runSpacing: 16,
-            children: [
-              _buildLegendItem(
-                "Captured Links",
-                "${stats.linkPercentage}%",
-                Colors.deepPurpleAccent,
+            const SizedBox(height: 48),
+
+            const Text(
+              "SMART COLLECTIONS",
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+                color: Colors.grey,
               ),
-              _buildLegendItem(
-                "Code Snippets",
-                "${stats.codePercentage}%",
-                Colors.green,
-              ),
-              _buildLegendItem(
-                "Plain Text",
-                "${stats.textPercentage}%",
-                Colors.orange,
-              ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(height: 24),
+            _buildCollectionsGrid(context),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildLegendItem(String label, String val, Color col) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(color: col, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          val,
-          style: TextStyle(
-            fontSize: 14,
-            color: isDark ? Colors.white54 : Colors.black54,
-          ),
-        ),
-      ],
+  Widget _buildCollectionsGrid(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        childAspectRatio: 1.5,
+      ),
+      itemCount: smartFolders.length + 1, // +1 for the "Create New" button
+      itemBuilder: (context, index) {
+        if (index == smartFolders.length) {
+          return _buildCreateFolderCard(context);
+        }
+        return _buildSmartFolderCard(smartFolders[index]);
+      },
     );
   }
 
-  Widget _buildFolderCard({
-    required CategoryDefinition category,
-    required int itemCount,
-  }) {
-    return Material(
-      color: Colors.transparent,
+  Widget _buildSmartFolderCard(SmartFolder folder) {
+    final color = Color(folder.colorValue);
+    final icon = IconData(folder.iconCodePoint, fontFamily: 'MaterialIcons');
+
+    // 🧠 Dynamically count how many items match this folder's rules!
+    int count = 0;
+    for (var item in history) {
+      final content = item.content.toLowerCase();
+      final title = item.title?.toLowerCase() ?? '';
+      final text = item.articleText?.toLowerCase() ?? '';
+
+      for (var kw in folder.keywords) {
+        if (content.contains(kw) || title.contains(kw) || text.contains(kw)) {
+          count++;
+          break;
+        }
+      }
+    }
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
       child: InkWell(
-        onTap: () => onCategorySelected(category.id),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark ? Colors.white10 : Colors.black12,
-              width: 1,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: category.color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(category.icon, color: category.color, size: 22),
-              ),
-              Column(
+        onTap: () => onCategorySelected(folder.name),
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: color, size: 24),
+                  ),
+                  const Spacer(),
                   Text(
-                    category.label,
+                    folder.name,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 15,
+                      fontSize: 16,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "$itemCount items",
+                    "$count items",
                     style: TextStyle(
-                      color: isDark ? Colors.white38 : Colors.black38,
+                      color: isDark ? Colors.white54 : Colors.black54,
                       fontSize: 12,
                     ),
                   ),
                 ],
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                icon: Icon(
+                  Icons.delete_outline,
+                  size: 18,
+                  color: isDark ? Colors.white30 : Colors.black38,
+                ),
+                onPressed: () {
+                  AudioService.playThwack();
+                  onDeleteFolder(folder.id);
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCreateFolderCard(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? Colors.white10 : Colors.black12,
+          style: BorderStyle.solid,
+        ),
+      ),
+      color: isDark
+          ? Colors.white.withOpacity(0.02)
+          : Colors.black.withOpacity(0.02),
+      child: InkWell(
+        onTap: () {
+          AudioService.playClick();
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            // 🛠 FIX: Ensure we are using the 'modalContext' so it pops correctly!
+            builder: (modalContext) => SmartFolderModal(
+              onSave: (folder) {
+                onCreateFolder(folder);
+                Navigator.pop(modalContext); // Pops the modal!
+              },
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.add_circle_outline,
+                color: isDark ? Colors.white54 : Colors.black54,
+                size: 32,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "New Collection",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white54 : Colors.black54,
+                ),
               ),
             ],
           ),
