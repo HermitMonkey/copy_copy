@@ -53,6 +53,8 @@ dependencies:
   window_manager: ^0.5.1
   hotkey_manager: ^0.2.3
   audioplayers: ^6.6.0
+  launch_at_startup: ^0.5.1
+  package_info_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:

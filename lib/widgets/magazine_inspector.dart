@@ -22,6 +22,81 @@ class MagazineInspector extends StatelessWidget {
     }
   }
 
+  Widget _buildPdfCard(String pdfUrl, bool isDark) {
+    final uri = Uri.tryParse(pdfUrl);
+    final filename = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : "Document.pdf";
+    final domain = uri?.host ?? "External Source";
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
+      ),
+      color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF9F9FB),
+      child: InkWell(
+        onTap: () => _openInBrowser(pdfUrl),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.picture_as_pdf_rounded,
+                  color: Colors.redAccent,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      Uri.decodeComponent(filename),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      domain.toUpperCase(),
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : Colors.black54,
+                        fontSize: 10,
+                        letterSpacing: 1,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              Icon(
+                Icons.open_in_new_rounded,
+                color: isDark ? Colors.white30 : Colors.black38,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -61,7 +136,7 @@ class MagazineInspector extends StatelessWidget {
                         _buildDetailedInfoBar(),
                         const SizedBox(height: 32),
 
-                        // 🛠 NEW: RENDER PDF ATTACHMENTS
+                        // PDF ATTACHMENTS
                         if (item.attachedPdfs != null &&
                             item.attachedPdfs!.isNotEmpty) ...[
                           Text(
@@ -80,9 +155,7 @@ class MagazineInspector extends StatelessWidget {
                           const SizedBox(height: 32),
                         ],
 
-                        // 🛠 RESTORED: CONTEXTUAL IMAGE GALLERY
-
-                        // 🛠 RESTORED: CONTEXTUAL IMAGE GALLERY
+                        // CONTEXTUAL IMAGE GALLERY
                         if (item.contextualImages != null &&
                             item.contextualImages!.isNotEmpty) ...[
                           SizedBox(
@@ -113,7 +186,7 @@ class MagazineInspector extends StatelessWidget {
                         const Divider(thickness: 0.5),
                         const SizedBox(height: 40),
 
-                        // 🛠 RESTORED: THE TL;DR BOX
+                        // THE TL;DR BOX
                         if (item.generatedSummary != null &&
                             item.generatedSummary!.isNotEmpty)
                           Container(
@@ -131,16 +204,16 @@ class MagazineInspector extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
+                                const Row(
                                   children: [
-                                    const Icon(
+                                    Icon(
                                       Icons.auto_awesome,
                                       color: Colors.deepPurpleAccent,
                                       size: 20,
                                     ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      "Quick Summary",
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "Summary",
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.deepPurpleAccent,
@@ -165,9 +238,14 @@ class MagazineInspector extends StatelessWidget {
                             ),
                           ),
 
+                        // 🛠 MOVED: RAW SOURCE IMMEDIATELY BELOW SUMMARY
+                        _buildSourceFooter(),
+                        const SizedBox(height: 40),
+
                         // Main Article Body
                         Text(
-                          item.articleText ?? item.content,
+                          item.articleText ??
+                              "", // Only show if we actually enriched something
                           style: TextStyle(
                             fontSize: 19,
                             height: 1.75,
@@ -178,8 +256,6 @@ class MagazineInspector extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 80),
-                        _buildSourceFooter(),
-                        const SizedBox(height: 60),
                       ],
                     ),
                   ),
@@ -302,6 +378,7 @@ class MagazineInspector extends StatelessWidget {
 
   Widget _buildSourceFooter() {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: isDark
@@ -331,83 +408,6 @@ class MagazineInspector extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPdfCard(String pdfUrl, bool isDark) {
-    final uri = Uri.tryParse(pdfUrl);
-    final filename = uri?.pathSegments.isNotEmpty == true
-        ? uri!.pathSegments.last
-        : "Document.pdf";
-    final domain = uri?.host ?? "External Source";
-
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: isDark ? Colors.white10 : Colors.black12),
-      ),
-      color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF9F9FB),
-      child: InkWell(
-        onTap: () => _openInBrowser(pdfUrl),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.picture_as_pdf_rounded,
-                  color: Colors.redAccent,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      Uri.decodeComponent(
-                        filename,
-                      ), // Clean up %20 in filenames
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      domain.toUpperCase(),
-                      style: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.black54,
-                        fontSize: 10,
-                        letterSpacing: 1,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              Icon(
-                Icons.open_in_new_rounded,
-                color: isDark ? Colors.white30 : Colors.black38,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

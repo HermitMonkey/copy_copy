@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:launch_at_startup/launch_at_startup.dart';
 import '../services/firestore_sync_service.dart';
 import '../services/audio_service.dart';
 
-class SettingsModal extends StatelessWidget {
+class SettingsModal extends StatefulWidget {
   final ThemeMode currentThemeMode;
   final Function(ThemeMode) onThemeChanged;
   final int currentTrayLimit;
@@ -20,6 +21,45 @@ class SettingsModal extends StatelessWidget {
     required this.onNuclearReset,
     required this.onExportJson,
   });
+
+  @override
+  State<SettingsModal> createState() => _SettingsModalState();
+}
+
+class _SettingsModalState extends State<SettingsModal> {
+  bool _isLaunchAtLoginEnabled = false;
+  bool _soundsEnabled = !AudioService.isMuted;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStartupStatus();
+  }
+
+  Future<void> _checkStartupStatus() async {
+    bool isEnabled = await launchAtStartup.isEnabled();
+    setState(() => _isLaunchAtLoginEnabled = isEnabled);
+  }
+
+  Future<void> _toggleLaunchAtLogin(bool value) async {
+    // Optimistically update the UI so it doesn't bounce annoyingly in Dev Mode
+    setState(() => _isLaunchAtLoginEnabled = value);
+    try {
+      if (value) {
+        await launchAtStartup.enable();
+      } else {
+        await launchAtStartup.disable();
+      }
+    } catch (e) {
+      // Fails silently in debug mode, but visual state is preserved for testing
+    }
+  }
+
+  void _toggleSounds(bool value) {
+    setState(() => _soundsEnabled = value);
+    AudioService.toggleMute(!value);
+    if (value) AudioService.playClick();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +81,7 @@ class SettingsModal extends StatelessWidget {
 
           // --- PREFERENCES ---
           const Text(
-            "APPEARANCE",
+            "SYSTEM PREFERENCES",
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
@@ -50,6 +90,48 @@ class SettingsModal extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+
+          SwitchListTile(
+            title: const Text(
+              "Launch at Login",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              "Start Phoenix silently in the background",
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white54 : Colors.black54,
+              ),
+            ),
+            value: _isLaunchAtLoginEnabled,
+            onChanged: (val) {
+              AudioService.playClick();
+              _toggleLaunchAtLogin(val);
+            },
+            activeColor: Colors.deepPurpleAccent,
+            contentPadding: EdgeInsets.zero,
+          ),
+
+          // 🛠 NEW: Mute Toggle
+          SwitchListTile(
+            title: const Text(
+              "UI Sounds & Alerts",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              "Play audio for background saves and major actions",
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? Colors.white54 : Colors.black54,
+              ),
+            ),
+            value: _soundsEnabled,
+            onChanged: _toggleSounds,
+            activeColor: Colors.deepPurpleAccent,
+            contentPadding: EdgeInsets.zero,
+          ),
+          const SizedBox(height: 24),
+
           SegmentedButton<ThemeMode>(
             segments: const [
               ButtonSegment(
@@ -68,10 +150,10 @@ class SettingsModal extends StatelessWidget {
                 label: Text("Dark"),
               ),
             ],
-            selected: {currentThemeMode},
+            selected: {widget.currentThemeMode},
             onSelectionChanged: (Set<ThemeMode> newSelection) {
               AudioService.playClick();
-              onThemeChanged(newSelection.first);
+              widget.onThemeChanged(newSelection.first);
             },
           ),
           const SizedBox(height: 32),
@@ -93,11 +175,13 @@ class SettingsModal extends StatelessWidget {
               ButtonSegment(value: 55, label: Text("55 Items")),
             ],
             selected: {
-              {8, 15, 55}.contains(currentTrayLimit) ? currentTrayLimit : 15,
+              {8, 15, 55}.contains(widget.currentTrayLimit)
+                  ? widget.currentTrayLimit
+                  : 15,
             },
             onSelectionChanged: (Set<int> newSelection) {
               AudioService.playClick();
-              onTrayLimitChanged(newSelection.first);
+              widget.onTrayLimitChanged(newSelection.first);
             },
           ),
           const Divider(height: 48),
@@ -162,7 +246,7 @@ class SettingsModal extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: () {
                     AudioService.playClick();
-                    onExportJson();
+                    widget.onExportJson();
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.download_rounded),
@@ -176,8 +260,8 @@ class SettingsModal extends StatelessWidget {
               Expanded(
                 child: FilledButton.icon(
                   onPressed: () {
-                    AudioService.playThwack(); // Heavy sound for deletion!
-                    onNuclearReset();
+                    AudioService.playThwack();
+                    widget.onNuclearReset();
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.warning_amber_rounded),

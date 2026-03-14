@@ -7,11 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:clipboard_watcher/clipboard_watcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
-import 'package:path_provider/path_provider.dart'; // 🛠 Needed for Export
+import 'package:path_provider/path_provider.dart';
 import 'services/app_initialization_service.dart';
 import 'services/clipboard_classifier.dart';
 import 'services/clipboard_enricher.dart';
 import 'services/firestore_sync_service.dart';
+import 'services/audio_service.dart';
 import 'models/clipboard_item.dart';
 import 'phoenix_board.dart';
 import 'system_tray_manager.dart';
@@ -22,6 +23,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppInitializationService.initializeWindowManager();
   await AppInitializationService.initializeFirebaseAndSecurity();
+  await AppInitializationService.initializeLaunchAtStartup();
   isar = await AppInitializationService.initializeIsarDatabase();
   runApp(const CopyCopyApp());
 }
@@ -75,7 +77,6 @@ class _CopyCopyAppState extends State<CopyCopyApp>
       modifiers: [HotKeyModifier.meta, HotKeyModifier.shift],
       scope: HotKeyScope.system,
     );
-
     await hotKeyManager.register(
       hotKey,
       keyDownHandler: (hotKey) async {
@@ -101,9 +102,7 @@ class _CopyCopyAppState extends State<CopyCopyApp>
   Future<void> _updateTrayLimit(int newLimit) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('trayLimit', newLimit);
-    setState(() {
-      _trayLimit = newLimit;
-    });
+    setState(() => _trayLimit = newLimit);
     _loadHistoryFromDisk();
   }
 
@@ -123,9 +122,8 @@ class _CopyCopyAppState extends State<CopyCopyApp>
     final trayItems = _clipboardHistory.take(_trayLimit).map((e) {
       String displayText = e.title ?? e.content;
       displayText = displayText.replaceAll('\n', ' ').trim();
-      if (displayText.length > 40) {
+      if (displayText.length > 40)
         displayText = '${displayText.substring(0, 40)}...';
-      }
       return displayText;
     }).toList();
     _trayManager.updateMenu(trayItems);
@@ -133,15 +131,38 @@ class _CopyCopyAppState extends State<CopyCopyApp>
 
   void _setTheme(ThemeMode mode) => setState(() => _themeMode = mode);
 
-  // 🛠 NEW: Nuclear Wipe
-  Future<void> _nuclearReset() async {
+  Future<void> _nuclearReset(BuildContext context) async {
     await isar.writeTxn(() async {
       await isar.clipboardItems.clear();
     });
     _loadHistoryFromDisk();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.delete_sweep_rounded, color: Colors.white),
+              SizedBox(width: 12),
+              Text(
+                "Database Wipe Complete",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.redAccent,
+          duration: const Duration(milliseconds: 800),
+          behavior: SnackBarBehavior.floating,
+          width: 320,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+        ),
+      );
+    }
   }
 
-  // 🛠 NEW: Data Export to Downloads Folder
   Future<void> _exportData(BuildContext context) async {
     try {
       final dir = await getDownloadsDirectory();
@@ -164,9 +185,17 @@ class _CopyCopyAppState extends State<CopyCopyApp>
 
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Data successfully exported to Downloads folder!"),
+            SnackBar(
+              content: const Text(
+                "Data exported to Downloads folder!",
+                textAlign: TextAlign.center,
+              ),
               backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              width: 320,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
             ),
           );
         }
@@ -182,6 +211,9 @@ class _CopyCopyAppState extends State<CopyCopyApp>
     final String? content = clipboardData?.text;
 
     if (content != null && content.isNotEmpty) {
+      // 🎵 AUDIO POLISH: Fire immediately on ANY copy/cut, regardless of whether it's a duplicate!
+      AudioService.playCopied();
+
       final bool sensitiveFlag = ClipboardClassifier.isSensitive(content);
       final String typeFlag = ClipboardClassifier.determineContentType(content);
 
@@ -260,8 +292,8 @@ class _CopyCopyAppState extends State<CopyCopyApp>
         onThemeChanged: _setTheme,
         currentTrayLimit: _trayLimit,
         onTrayLimitChanged: _updateTrayLimit,
-        onNuclearReset: _nuclearReset, // 🛠 Passed down!
-        onExportJson: _exportData, // 🛠 Passed down!
+        onNuclearReset: _nuclearReset,
+        onExportJson: _exportData,
       ),
     );
   }

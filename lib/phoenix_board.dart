@@ -3,11 +3,10 @@ import 'package:window_manager/window_manager.dart';
 import 'models/clipboard_item.dart';
 import 'services/category_service.dart';
 import 'services/audio_service.dart';
-
 import 'widgets/sidebar_feed.dart';
 import 'widgets/global_dashboard.dart';
 import 'widgets/magazine_inspector.dart';
-import 'widgets/settings_modal.dart'; // 🛠 NEW IMPORT
+import 'widgets/settings_modal.dart';
 
 class PhoenixBoard extends StatefulWidget {
   final List<ClipboardItem> history;
@@ -16,9 +15,7 @@ class PhoenixBoard extends StatefulWidget {
   final Function(ThemeMode) onThemeChanged;
   final int currentTrayLimit;
   final Function(int) onTrayLimitChanged;
-
-  // 🛠 NEW: Execution Callbacks
-  final VoidCallback onNuclearReset;
+  final Function(BuildContext) onNuclearReset; // 🛠 Updated to take Context
   final Function(BuildContext) onExportJson;
 
   const PhoenixBoard({
@@ -44,22 +41,19 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
   String? _activeCategory;
 
   void _selectItemAndInspect(ClipboardItem item) {
-    AudioService.playClick(); // 🎵 Audio Polish
-    setState(() => _selectedItem = item);
+    setState(() => _selectedItem = item); // 🛠 Muted standard nav
   }
 
   void _backToDashboard() {
-    AudioService.playClick(); // 🎵 Audio Polish
     setState(() {
       _selectedItem = null;
       _searchQuery = '';
-    });
+    }); // 🛠 Muted standard nav
   }
 
   void _togglePin() async {
-    AudioService.playClick(); // 🎵 Audio Polish
     setState(() => _isPinned = !_isPinned);
-    await windowManager.setAlwaysOnTop(_isPinned);
+    await windowManager.setAlwaysOnTop(_isPinned); // 🛠 Muted standard nav
   }
 
   List<ClipboardItem> get _filteredHistory {
@@ -81,7 +75,7 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
   }
 
   void _showSettings(BuildContext context) {
-    AudioService.playClick();
+    AudioService.playClick(); // Keep sound for opening settings
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -90,7 +84,8 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
         onThemeChanged: widget.onThemeChanged,
         currentTrayLimit: widget.currentTrayLimit,
         onTrayLimitChanged: widget.onTrayLimitChanged,
-        onNuclearReset: widget.onNuclearReset,
+        onNuclearReset: () =>
+            widget.onNuclearReset(context), // Pass context here!
         onExportJson: () => widget.onExportJson(context),
       ),
     );
@@ -124,7 +119,6 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
             }),
             activeCategory: _activeCategory,
             onClearCategory: () {
-              AudioService.playClick();
               setState(() => _activeCategory = null);
             },
           ),
@@ -136,7 +130,6 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
                       history: widget.history,
                       isDark: isDark,
                       onCategorySelected: (category) {
-                        AudioService.playClick(); // 🎵 Audio Polish
                         setState(() {
                           _activeCategory = category;
                           _selectedItem = null;

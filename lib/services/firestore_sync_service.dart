@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/clipboard_item.dart';
 import 'encryption_service.dart';
+import 'audio_service.dart';
 
 class FirestoreSyncService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
