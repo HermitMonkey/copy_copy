@@ -14,9 +14,9 @@ import 'services/clipboard_enricher.dart';
 import 'services/firestore_sync_service.dart';
 import 'services/audio_service.dart';
 import 'models/clipboard_item.dart';
+import 'models/smart_folder.dart';
 import 'phoenix_board.dart';
 import 'system_tray_manager.dart';
-import 'models/smart_folder.dart';
 
 late Isar isar;
 
@@ -26,12 +26,43 @@ void main() async {
   await AppInitializationService.initializeFirebaseAndSecurity();
   await AppInitializationService.initializeLaunchAtStartup();
   isar = await AppInitializationService.initializeIsarDatabase();
+
+  // 🛠 NEW: Seed the database with a Welcome Note if it's totally empty!
+  final count = await isar.clipboardItems.count();
+  if (count == 0) {
+    await isar.writeTxn(() async {
+      final welcomeNote = ClipboardItem()
+        ..title = "Welcome to VaultCopy 🚀"
+        ..content = "Your privacy-first, intelligent clipboard vault is ready."
+        ..articleText = """
+Welcome to your new privacy-first, intelligent clipboard workspace!
+
+HOW TO USE YOUR VAULT
+
+• Press CMD+Shift+V anywhere on your Mac to summon this dashboard instantly.
+• Copy any text, link, or image, and it will be securely vaulted here in the background.
+• Use the 'Jot down a thought...' bar above to write manual notes exactly like this one.
+• Create 'Smart Collections' using trigger keywords to automatically organize your chaotic clipboard history.
+
+PRIVACY FIRST
+
+Everything you see here is stored locally on your Mac using an encrypted Isar database. No unwanted cloud scraping, no privacy leaks. You have complete control over your data.
+
+Happy copying!
+"""
+        ..contentType = 'note'
+        ..timestamp = DateTime.now()
+        ..isSensitive = false;
+
+      await isar.clipboardItems.put(welcomeNote);
+    });
+  }
+
   runApp(const CopyCopyApp());
 }
 
 class CopyCopyApp extends StatefulWidget {
   const CopyCopyApp({super.key});
-
   @override
   State<CopyCopyApp> createState() => _CopyCopyAppState();
 }
@@ -41,35 +72,38 @@ class _CopyCopyAppState extends State<CopyCopyApp>
   final SystemTrayManager _trayManager = SystemTrayManager();
   final List<ClipboardItem> _clipboardHistory = [];
   final List<SmartFolder> _smartFolders = [];
+
   ThemeMode _themeMode = ThemeMode.system;
   int _trayLimit = 15;
 
   @override
   void initState() {
     super.initState();
-    _trayManager.init(
-      onOpenDashboard: () => windowManager.show(),
-      history: const [],
-    );
+    _trayManager.init(onOpenDashboard: () => _toggleDashboard(), history: []);
     clipboardWatcher.addListener(this);
     clipboardWatcher.start();
     windowManager.addListener(this);
 
     _loadSettingsAndHistory();
     _registerGlobalHotkey();
-    Future.delayed(const Duration(milliseconds: 500), () {
-      windowManager.hide();
-      _syncTrayMenu();
-    });
+    Future.delayed(
+      const Duration(milliseconds: 500),
+      () => windowManager.hide(),
+    );
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
     clipboardWatcher.removeListener(this);
-    hotKeyManager.unregisterAll();
     super.dispose();
   }
+
+  @override
+  void onWindowHide() => _syncTrayMenu();
+
+  @override
+  void onWindowShow() => _syncTrayMenu();
 
   Future<void> _registerGlobalHotkey() async {
     await hotKeyManager.unregisterAll();
@@ -80,29 +114,31 @@ class _CopyCopyAppState extends State<CopyCopyApp>
     );
     await hotKeyManager.register(
       hotKey,
-      keyDownHandler: (_) async {
-        final isVisible = await windowManager.isVisible();
-        if (isVisible) {
-          await windowManager.hide();
-        } else {
-          await windowManager.show();
-          await windowManager.focus();
-        }
-        _syncTrayMenu();
-      },
+      keyDownHandler: (_) async => _toggleDashboard(),
     );
+  }
+
+  Future<void> _toggleDashboard() async {
+    final isVisible = await windowManager.isVisible();
+    if (isVisible) {
+      await windowManager.hide();
+    } else {
+      await windowManager.show();
+      await windowManager.focus();
+    }
   }
 
   Future<void> _loadSettingsAndHistory() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) {
-      return;
-    }
+    setState(() => _trayLimit = prefs.getInt('trayLimit') ?? 15);
+    _loadHistoryFromDisk();
+  }
 
-    setState(() {
-      _trayLimit = prefs.getInt('trayLimit') ?? 15;
-    });
-    await _loadHistoryFromDisk();
+  Future<void> _updateTrayLimit(int newLimit) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('trayLimit', newLimit);
+    setState(() => _trayLimit = newLimit);
+    _loadHistoryFromDisk();
   }
 
   Future<void> _loadHistoryFromDisk() async {
@@ -112,41 +148,21 @@ class _CopyCopyAppState extends State<CopyCopyApp>
         .findAll();
     final folders = await isar.smartFolders.where().sortBySortOrder().findAll();
 
-    if (!mounted) {
-      return;
-    }
-
     setState(() {
       _clipboardHistory.clear();
       _clipboardHistory.addAll(items);
-
       _smartFolders.clear();
       _smartFolders.addAll(folders);
     });
     _syncTrayMenu();
   }
 
-  Future<void> _createSmartFolder(SmartFolder folder) async {
-    await isar.writeTxn(() async {
-      await isar.smartFolders.put(folder);
-    });
-    await _loadHistoryFromDisk();
-  }
-
-  Future<void> _deleteSmartFolder(int id) async {
-    await isar.writeTxn(() async {
-      await isar.smartFolders.delete(id);
-    });
-    await _loadHistoryFromDisk();
-  }
-
   void _syncTrayMenu() {
     final trayItems = _clipboardHistory.take(_trayLimit).map((e) {
       String displayText = e.title ?? e.content;
       displayText = displayText.replaceAll('\n', ' ').trim();
-      if (displayText.length > 40) {
+      if (displayText.length > 40)
         displayText = '${displayText.substring(0, 40)}...';
-      }
       return displayText;
     }).toList();
     _trayManager.updateMenu(trayItems);
@@ -154,53 +170,30 @@ class _CopyCopyAppState extends State<CopyCopyApp>
 
   void _setTheme(ThemeMode mode) => setState(() => _themeMode = mode);
 
-  Future<void> _updateTrayLimit(int newLimit) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('trayLimit', newLimit);
-    if (!mounted) {
-      return;
-    }
+  Future<void> _createSmartFolder(SmartFolder folder) async {
+    await isar.writeTxn(() async {
+      await isar.smartFolders.put(folder);
+    });
+    _loadHistoryFromDisk();
+  }
 
-    setState(() => _trayLimit = newLimit);
-    _syncTrayMenu();
+  Future<void> _deleteSmartFolder(int id) async {
+    await isar.writeTxn(() async {
+      await isar.smartFolders.delete(id);
+    });
+    _loadHistoryFromDisk();
+  }
+
+  Future<void> _deleteSingleItem(int id) async {
+    await isar.writeTxn(() async {
+      await isar.clipboardItems.delete(id);
+    });
+    _loadHistoryFromDisk();
   }
 
   Future<void> _nuclearReset(BuildContext context) async {
     await isar.writeTxn(() async {
       await isar.clipboardItems.clear();
-    });
-    await _loadHistoryFromDisk();
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.delete_sweep_rounded, color: Colors.white),
-              SizedBox(width: 12),
-              Text(
-                "Database Wipe Complete",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          backgroundColor: Colors.redAccent,
-          duration: const Duration(milliseconds: 800),
-          behavior: SnackBarBehavior.floating,
-          width: 320,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-        ),
-      );
-    }
-  }
-
-  // 🛠 NEW: Delete a single item
-  Future<void> _deleteSingleItem(int id) async {
-    await isar.writeTxn(() async {
-      await isar.clipboardItems.delete(id);
     });
     _loadHistoryFromDisk();
   }
@@ -224,26 +217,37 @@ class _CopyCopyAppState extends State<CopyCopyApp>
             .toList();
 
         await file.writeAsString(jsonEncode(data));
-
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                "Data exported to Downloads folder!",
-                textAlign: TextAlign.center,
-              ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-              width: 320,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-          );
-        }
       }
     } catch (e) {
       debugPrint("Export failed: $e");
+    }
+  }
+
+  // 🛠 NEW: Dedicated method for manual notes
+  Future<void> _saveManualNote(String title, String content) async {
+    AudioService.playCopied();
+
+    await isar.writeTxn(() async {
+      final newItem = ClipboardItem()
+        ..content = content
+        ..title = title.isNotEmpty ? title : "Quick Note"
+        ..articleText =
+            content // Save body here for beautiful rendering in Inspector
+        ..timestamp = DateTime.now()
+        ..isSensitive = false
+        ..contentType = 'note'; // 🧠 Flagged specifically as a note!
+      await isar.clipboardItems.put(newItem);
+    });
+
+    _loadHistoryFromDisk();
+
+    // Sync to cloud just like a clipboard item
+    final savedItem = await isar.clipboardItems
+        .where()
+        .sortByTimestampDesc()
+        .findFirst();
+    if (savedItem != null) {
+      FirestoreSyncService.queueItemForSync(savedItem);
     }
   }
 
@@ -253,9 +257,7 @@ class _CopyCopyAppState extends State<CopyCopyApp>
     final String? content = clipboardData?.text;
 
     if (content != null && content.isNotEmpty) {
-      // 🎵 AUDIO POLISH: Fire immediately on ANY copy/cut, regardless of whether it's a duplicate!
       AudioService.playCopied();
-
       final bool sensitiveFlag = ClipboardClassifier.isSensitive(content);
       final String typeFlag = ClipboardClassifier.determineContentType(content);
 
@@ -283,13 +285,12 @@ class _CopyCopyAppState extends State<CopyCopyApp>
               .where()
               .sortByTimestamp()
               .findFirst();
-          if (oldestItem != null) {
+          if (oldestItem != null)
             await isar.clipboardItems.delete(oldestItem.id);
-          }
         }
       });
 
-      await _loadHistoryFromDisk();
+      _loadHistoryFromDisk();
 
       final newlySavedItem = await isar.clipboardItems
           .where()
@@ -303,9 +304,8 @@ class _CopyCopyAppState extends State<CopyCopyApp>
             final enrichedItem = await isar.clipboardItems.get(
               newlySavedItem.id,
             );
-            if (enrichedItem != null) {
+            if (enrichedItem != null)
               FirestoreSyncService.queueItemForSync(enrichedItem);
-            }
           });
         } else {
           FirestoreSyncService.queueItemForSync(newlySavedItem);
@@ -332,11 +332,7 @@ class _CopyCopyAppState extends State<CopyCopyApp>
       home: PhoenixBoard(
         history: _clipboardHistory,
         smartFolders: _smartFolders,
-        onHide: () {
-          windowManager.hide();
-          _syncTrayMenu();
-        },
-        onDeleteSingleItem: _deleteSingleItem,
+        onHide: () => windowManager.hide(),
         currentThemeMode: _themeMode,
         onThemeChanged: _setTheme,
         currentTrayLimit: _trayLimit,
@@ -345,6 +341,8 @@ class _CopyCopyAppState extends State<CopyCopyApp>
         onExportJson: _exportData,
         onCreateFolder: _createSmartFolder,
         onDeleteFolder: _deleteSmartFolder,
+        onDeleteSingleItem: _deleteSingleItem,
+        onSaveNote: _saveManualNote, // 🛠 NEW: Pass down the save method
       ),
     );
   }

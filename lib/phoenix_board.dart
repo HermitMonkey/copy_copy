@@ -23,6 +23,8 @@ class PhoenixBoard extends StatefulWidget {
   final Function(SmartFolder) onCreateFolder; // 🛠 NEW
   final Function(int) onDeleteFolder; // 🛠 NEW
 
+  final Function(String, String) onSaveNote;
+
   const PhoenixBoard({
     super.key,
     required this.onDeleteSingleItem,
@@ -37,6 +39,7 @@ class PhoenixBoard extends StatefulWidget {
     required this.onExportJson,
     required this.onCreateFolder,
     required this.onDeleteFolder,
+    required this.onSaveNote,
   });
 
   @override
@@ -170,6 +173,7 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
                       },
                       onCreateFolder: widget.onCreateFolder, // 🛠 Passed down
                       onDeleteFolder: widget.onDeleteFolder, // 🛠 Passed down
+                      onSaveNote: widget.onSaveNote, // 🛠 Add this!
                     )
                   : MagazineInspector(
                       item: _selectedItem!,
