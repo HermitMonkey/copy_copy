@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/clipboard_item.dart';
-import '../services/audio_service.dart'; // 🛠 Added audio service import!
+import '../services/audio_service.dart';
+import '../services/license_service.dart';
 
 class SidebarFeed extends StatelessWidget {
   final bool isDark;
@@ -190,11 +191,9 @@ class SidebarFeed extends StatelessWidget {
                               ),
                             )
                           : Icon(
-                              item.contentType == 'url'
-                                  ? Icons.link
-                                  : Icons.notes,
+                              _iconForType(item.contentType),
                               size: 18,
-                              color: Colors.deepPurpleAccent,
+                              color: _colorForType(item.contentType),
                             ),
                       title: Text(
                         item.title ?? "Copied Content",
@@ -218,6 +217,10 @@ class SidebarFeed extends StatelessWidget {
               },
             ),
           ),
+
+          // Free-tier progress indicator
+          if (!LicenseService.isPro)
+            _FreeTierBar(isDark: isDark, count: history.length),
 
           Container(
             padding: const EdgeInsets.all(20),
@@ -251,6 +254,80 @@ class SidebarFeed extends StatelessWidget {
                   tooltip: "Hide Workspace",
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Maps content types to intuitive icons.
+IconData _iconForType(String? type) {
+  switch (type) {
+    case 'url':
+      return Icons.link_rounded;
+    case 'code':
+      return Icons.code_rounded;
+    case 'note':
+      return Icons.edit_note_rounded;
+    default:
+      return Icons.content_paste_rounded;
+  }
+}
+
+// Maps content types to accent colours.
+Color _colorForType(String? type) {
+  switch (type) {
+    case 'url':
+      return Colors.blueAccent;
+    case 'code':
+      return Colors.greenAccent;
+    case 'note':
+      return Colors.orangeAccent;
+    default:
+      return Colors.deepPurpleAccent;
+  }
+}
+
+/// A slim progress bar that appears at the bottom of the sidebar when the user
+/// is on the free tier, nudging them towards a Pro upgrade.
+class _FreeTierBar extends StatelessWidget {
+  final bool isDark;
+  final int count;
+
+  const _FreeTierBar({required this.isDark, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final limit = LicenseService.freeHistoryLimit;
+    final fraction = (count / limit).clamp(0.0, 1.0);
+    final isNearLimit = fraction >= 0.8;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 4,
+              backgroundColor: isDark ? Colors.white10 : Colors.black12,
+              color: isNearLimit ? Colors.orangeAccent : Colors.deepPurpleAccent,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isNearLimit
+                ? '$count / $limit items — upgrade for unlimited ✨'
+                : '$count / $limit items (free)',
+            style: TextStyle(
+              fontSize: 10,
+              color: isNearLimit
+                  ? Colors.orangeAccent
+                  : (isDark ? Colors.white30 : Colors.black38),
             ),
           ),
         ],

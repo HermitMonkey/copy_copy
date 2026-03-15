@@ -13,6 +13,7 @@ import 'services/clipboard_classifier.dart';
 import 'services/clipboard_enricher.dart';
 import 'services/firestore_sync_service.dart';
 import 'services/audio_service.dart';
+import 'services/license_service.dart';
 import 'models/clipboard_item.dart';
 import 'models/smart_folder.dart';
 import 'phoenix_board.dart';
@@ -26,6 +27,7 @@ void main() async {
   await AppInitializationService.initializeFirebaseAndSecurity();
   await AppInitializationService.initializeLaunchAtStartup();
   isar = await AppInitializationService.initializeIsarDatabase();
+  await LicenseService.initialize();
 
   // 🛠 NEW: Seed the database with a Welcome Note if it's totally empty!
   final count = await isar.clipboardItems.count();
@@ -280,7 +282,7 @@ class _CopyCopyAppState extends State<CopyCopyApp>
         }
 
         final count = await isar.clipboardItems.count();
-        if (count > 50) {
+        if (count > LicenseService.historyLimit) {
           final oldestItem = await isar.clipboardItems
               .where()
               .sortByTimestamp()
