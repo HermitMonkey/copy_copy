@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 import '../services/firestore_sync_service.dart';
 import '../services/audio_service.dart';
+import '../services/license_service.dart';
 
 class SettingsModal extends StatefulWidget {
   final ThemeMode currentThemeMode;
@@ -29,6 +30,14 @@ class SettingsModal extends StatefulWidget {
 class _SettingsModalState extends State<SettingsModal> {
   bool _isLaunchAtLoginEnabled = false;
   bool _soundsEnabled = !AudioService.isMuted;
+  bool _isPro = LicenseService.isPro;
+  final _licenseController = TextEditingController();
+
+  @override
+  void dispose() {
+    _licenseController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -59,6 +68,36 @@ class _SettingsModalState extends State<SettingsModal> {
     setState(() => _soundsEnabled = value);
     AudioService.toggleMute(!value);
     if (value) AudioService.playClick();
+  }
+
+  Future<void> _activatePro() async {
+    try {
+      await LicenseService.activate(_licenseController.text);
+      setState(() => _isPro = true);
+      _licenseController.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Pro activated! Enjoy unlimited history.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } on LicenseException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _deactivatePro() async {
+    await LicenseService.deactivate();
+    setState(() => _isPro = false);
   }
 
   @override
@@ -186,6 +225,43 @@ class _SettingsModalState extends State<SettingsModal> {
           ),
           const Divider(height: 48),
 
+          // --- COPY COPY PRO ---
+          const Text(
+            "COPY COPY PRO",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.5,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.deepPurpleAccent.withOpacity(0.08)
+                  : Colors.deepPurple.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.deepPurpleAccent.withOpacity(0.3),
+              ),
+            ),
+            child: _isPro ? _buildProActiveRow(isDark) : _buildUpgradeRow(isDark),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _isPro
+                ? 'Unlimited history (up to ${LicenseService.proHistoryLimit} items). Thank you! 🙏'
+                : 'Free tier: up to ${LicenseService.freeHistoryLimit} items. Upgrade for unlimited history & cloud sync.',
+            style: TextStyle(
+              fontSize: 11,
+              color: isDark ? Colors.white38 : Colors.black38,
+            ),
+          ),
+          const Divider(height: 48),
+
           // --- DATA & CLOUD ---
           const Text(
             "DATA & CLOUD",
@@ -277,6 +353,120 @@ class _SettingsModalState extends State<SettingsModal> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProActiveRow(bool isDark) {
+    return Row(
+      children: [
+        const Icon(Icons.verified_rounded, color: Colors.deepPurpleAccent),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pro License Active',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              if (LicenseService.activeLicenseKey != null)
+                Text(
+                  LicenseService.activeLicenseKey!,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'Courier',
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        TextButton(
+          onPressed: _deactivatePro,
+          child: const Text(
+            'Deactivate',
+            style: TextStyle(color: Colors.redAccent, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUpgradeRow(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Row(
+          children: [
+            Icon(Icons.lock_open_rounded, color: Colors.deepPurpleAccent),
+            SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                'Enter your license key to unlock Pro',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _licenseController,
+                style: const TextStyle(
+                  fontFamily: 'Courier',
+                  fontSize: 13,
+                  letterSpacing: 1.5,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'CCPRO-XXXX-XXXX-XXXX',
+                  hintStyle: TextStyle(
+                    color: isDark ? Colors.white24 : Colors.black26,
+                    fontFamily: 'Courier',
+                    letterSpacing: 1.5,
+                    fontSize: 13,
+                  ),
+                  filled: true,
+                  fillColor: isDark
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.black.withOpacity(0.03),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onSubmitted: (_) => _activatePro(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: _activatePro,
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.deepPurpleAccent,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+              ),
+              child: const Text('Activate'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Get a license key → ${LicenseService.storeUrl}',
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.deepPurpleAccent,
+            decoration: TextDecoration.underline,
+          ),
+        ),
+      ],
     );
   }
 }

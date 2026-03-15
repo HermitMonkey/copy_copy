@@ -375,7 +375,10 @@ class MagazineInspector extends StatelessWidget {
           _buildSlimButton(
             Icons.copy_rounded,
             "Copy",
-            () => Clipboard.setData(ClipboardData(text: item.content)),
+            () {
+              AudioService.playCopied();
+              Clipboard.setData(ClipboardData(text: item.content));
+            },
           ),
           const SizedBox(width: 12),
           if (item.contentType == 'url')

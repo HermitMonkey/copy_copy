@@ -86,26 +86,33 @@ class _PhoenixBoardState extends State<PhoenixBoard> {
       }
 
       if (_activeCategory != null) {
-        // Find the active Smart Folder object
-        final folder = widget.smartFolders
-            .where((f) => f.name == _activeCategory)
-            .firstOrNull;
-        if (folder == null) return false;
+        // Handle the built-in "Vault Notes" category separately
+        if (_activeCategory == 'Vault Notes') {
+          if (item.contentType != 'note') return false;
+        } else {
+          // Find the active Smart Folder object
+          final folder = widget.smartFolders
+              .where((f) => f.name == _activeCategory)
+              .firstOrNull;
+          if (folder == null) return false;
 
-        final content = item.content.toLowerCase();
-        final title = item.title?.toLowerCase() ?? '';
-        final text = item.articleText?.toLowerCase() ?? '';
+          final content = item.content.toLowerCase();
+          final title = item.title?.toLowerCase() ?? '';
+          final text = item.articleText?.toLowerCase() ?? '';
 
-        bool matches = false;
-        // Check if the item contains ANY of the trigger keywords
-        for (var kw in folder.keywords) {
-          if (kw.isEmpty) continue;
-          if (content.contains(kw) || title.contains(kw) || text.contains(kw)) {
-            matches = true;
-            break;
+          bool matches = false;
+          // Check if the item contains ANY of the trigger keywords
+          for (var kw in folder.keywords) {
+            if (kw.isEmpty) continue;
+            if (content.contains(kw) ||
+                title.contains(kw) ||
+                text.contains(kw)) {
+              matches = true;
+              break;
+            }
           }
+          if (!matches) return false;
         }
-        if (!matches) return false; // Hide it if it doesn't match the rules
       }
       return true;
     }).toList();
